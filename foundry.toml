@@ -1,0 +1,24 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 10_000_000
+via_ir = false
+gas_reports = ["YulSafeERC20", "SoladyVault"]
+
+[profile.zksync]
+src = "src"
+out = "out-zksync"
+libs = ["lib"]
+# zkSync VM configuration (requires zkforge or foundry-zksync)
+# vm = "zkSync"
+
+[rpc_endpoints]
+zksync_sepolia = "https://sepolia.era.zksync.dev"
+
+[etherscan]
+zksync_sepolia = { key = "${ZKSYNC_ETHERSCAN_API_KEY}", url = "https://api-sepolia.explorer.zksync.io/api" }
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

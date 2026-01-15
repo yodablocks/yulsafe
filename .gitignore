@@ -1,0 +1,29 @@
+# Build artifacts
+out/
+zkout/
+cache/
+broadcast/
+
+# Environment files (contains private keys!)
+.env
+
+# Coverage
+lcov.info
+
+# Flattened contracts (generated, not needed in repo)
+*_flattened.sol
+
+# Installation scripts (foundry-zksync installer artifacts)
+foundryup-zksync
+install
+install.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Claude Code
+.claude/
