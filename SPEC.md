@@ -840,17 +840,30 @@ test_gas_solady_mint()
 ### Phase 3: Testing & Deployment (Day 4)
 
 **Deliverables:**
-- ✅ Complete test suite (78 tests - all passing)
+- ✅ Complete test suite (127 tests - all passing)
 - ✅ Gas benchmark table (view functions optimized, security trade-off documented)
 - ✅ Deploy to zkSync Sepolia testnet (zksolc-compiled via foundry-zksync)
 - ✅ Verify contracts on explorer
 - ⬜ zkSync-specific gas measurements
 
 **Exit Criteria:**
-- ✅ All tests pass (78/78)
+- ✅ All tests pass (127/127)
 - ✅ Test coverage measured: 93% lines, 93% statements (YulSafeERC20.sol)
 - ✅ Contracts deployed and live
 - ✅ Gas benchmarks documented
+
+### Phase 3.5: Property-Based Testing (Day 5)
+
+**Deliverables:**
+- ✅ Invariant test suite (16 tests)
+- ✅ Rounding property fuzz tests (19 tests)
+- ✅ Inflation attack resistance fuzz tests (14 tests)
+- ✅ Handler contract for invariant testing
+
+**Exit Criteria:**
+- ✅ All invariants hold across 12,800+ random state transitions
+- ✅ Rounding always favors vault (proven via fuzzing)
+- ✅ Inflation attacks cannot cause 0 shares for victims
 
 ### Phase 4: Documentation & Polish (Day 5)
 
@@ -978,8 +991,12 @@ forge install foundry-rs/forge-std
 ### Code Artifacts
 - [x] `src/YulSafeERC20.sol` - ERC20 vault implementation
 - [ ] `src/YulSafeETH.sol` - Native ETH vault implementation (if time)
-- [x] `test/YulSafe.t.sol` - Comprehensive test suite (38 unit tests passing)
+- [x] `test/YulSafe.t.sol` - Comprehensive test suite (62 unit tests passing)
 - [x] `test/GasBenchmark.t.sol` - Gas comparison tests (16 benchmark tests)
+- [x] `test/invariants/Handler.sol` - Handler for invariant testing
+- [x] `test/invariants/YulSafeInvariants.t.sol` - Invariant tests (16 tests)
+- [x] `test/fuzz/RoundingProperties.t.sol` - Rounding fuzz tests (19 tests)
+- [x] `test/fuzz/InflationAttack.t.sol` - Inflation attack fuzz tests (14 tests)
 - [x] `test/mocks/MockERC20.sol` - Mock token for testing
 - [x] `test/mocks/SoladyVault.sol` - Solady ERC4626 wrapper for comparison
 - [x] `script/Deploy.s.sol` - Deployment script

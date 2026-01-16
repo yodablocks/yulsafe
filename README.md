@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-blue)](https://soliditylang.org/)
-[![Tests](https://img.shields.io/badge/Tests-54%2F54_passing-brightgreen)](https://github.com/yourusername/yulsafe)
+[![Tests](https://img.shields.io/badge/Tests-127%2F127_passing-brightgreen)](https://github.com/yourusername/yulsafe)
 
 > **⚡ Up to 59% gas savings on view functions** through packed storage and Yul optimization
 
@@ -16,11 +16,11 @@ YulSafe is a production-grade, gas-optimized ERC4626-compliant vault built with 
 - **ERC4626 Compliant**: Full compatibility with DeFi composability standards
 - **zkSync Native**: Optimized for zkSync Era's unique gas model
 - **Heavily Documented**: Every Yul block explained for reviewability
-- **Production Ready**: 100% test pass rate (78/78 tests), 93% coverage, zero compiler errors
+- **Production Ready**: 100% test pass rate (127/127 tests), comprehensive property-based testing
 
 ## 📊 Gas Benchmarks
 
-**All tests passing: 78/78 ✅** (62 unit tests + 16 benchmark tests)
+**All tests passing: 127/127 ✅** (62 unit + 16 benchmark + 16 invariant + 19 rounding fuzz + 14 inflation attack fuzz)
 
 ### View Functions (YulSafe Wins)
 
@@ -212,23 +212,52 @@ assembly {
 ## 🧪 Testing
 
 ```bash
-# Run full test suite (38 tests, 100% passing ✅)
+# Run full test suite (127 tests, 100% passing ✅)
 forge test
 
 # Run with verbosity
 forge test -vvv
 
+# Run invariant tests with more depth
+forge test --match-contract YulSafeInvariants --invariant-runs 1000
+
+# Run fuzz tests with more runs
+forge test --match-path "test/fuzz/*" --fuzz-runs 1000
+
 # Generate gas report
 forge test --gas-report
 ```
 
-**Test Coverage**: 78/78 tests passing (93% line coverage) covering:
-- Deployment & initialization
-- Deposit/withdraw/mint/redeem flows
-- First depositor attack protection
-- Admin functions (pause/unpause)
-- ERC4626 compliance
-- Fuzz testing
+**Test Coverage**: 127/127 tests passing covering:
+
+| Category | Tests | Description |
+|----------|-------|-------------|
+| Unit Tests | 62 | Core functionality, edge cases, ERC4626 compliance |
+| Gas Benchmarks | 16 | Performance comparison vs Solady ERC4626 |
+| Invariant Tests | 16 | Properties that must always hold (solvency, accounting) |
+| Rounding Fuzz | 19 | Verify rounding always favors vault |
+| Inflation Attack | 14 | First depositor attack resistance |
+
+### Property-Based Testing
+
+The test suite includes comprehensive **invariant and fuzz tests** verifying:
+
+**Core Invariants:**
+- `invariant_solvency` - Vault always has sufficient assets to back shares
+- `invariant_noSharesWithoutAssets` - No shares exist without backing
+- `invariant_minimumLiquidityLocked` - Dead shares permanently locked
+- `invariant_noValueExtraction` - Cannot withdraw more than deposited
+
+**Rounding Properties:**
+- `deposit()` rounds DOWN shares (user gets fewer)
+- `mint()` rounds UP assets (user pays more)
+- `withdraw()` rounds UP shares burned
+- `redeem()` rounds DOWN assets returned
+
+**Inflation Attack Resistance:**
+- Victim never receives 0 shares after donation attack
+- Attacker permanently loses MINIMUM_LIQUIDITY shares
+- Multiple victims all protected
 
 ## 🌐 Deployed Contracts (zkSync Sepolia)
 

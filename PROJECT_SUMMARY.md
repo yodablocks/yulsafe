@@ -24,17 +24,17 @@ YulSafe is a fully functional, gas-optimized ERC4626 vault implementation showca
 - ✅ Owner controls with Ownable
 
 ### Testing (100% Pass Rate) ✅
-- ✅ 78 comprehensive tests written (62 unit + 16 benchmark)
-- ✅ **78 tests passing (100%)**
-- ✅ Core functionality fully tested:
-  - Deployment & initialization
-  - Deposit/withdraw/mint/redeem flows
-  - First depositor attack protection
-  - Security mechanisms
-  - Admin functions
-  - ERC4626 compliance
-  - Fuzz testing (deposit & withdraw)
-  - Gas benchmarks (16 comparison tests)
+- ✅ **127 comprehensive tests written**
+- ✅ **127 tests passing (100%)**
+- ✅ Test suite breakdown:
+  | Category | Tests | Description |
+  |----------|-------|-------------|
+  | Unit Tests | 62 | Core functionality, edge cases, ERC4626 compliance |
+  | Gas Benchmarks | 16 | Performance comparison vs Solady ERC4626 |
+  | Invariant Tests | 16 | Properties that must always hold |
+  | Rounding Fuzz | 19 | Verify rounding always favors vault |
+  | Inflation Attack | 14 | First depositor attack resistance |
+- ✅ **Property-Based Testing** with Foundry invariants
 - ✅ All edge cases fixed (see fix-issue1.md for details)
 
 ### Documentation (100% Complete)
@@ -119,7 +119,7 @@ Assembly switch statements for first deposit logic branching.
 
 ### Secondary Metrics
 4. ✅ **Code Quality**: Zero compiler errors, zero warnings (except intentional linter note)
-5. ✅ **Test Coverage**: 93% line coverage, 100% pass rate (78/78 tests)
+5. ✅ **Test Coverage**: 100% pass rate (127/127 tests) with property-based testing
 6. ✅ **Documentation**: Comprehensive README + SECURITY + fix changelog
 7. ✅ **Deployment**: Live on zkSync Sepolia with verified contracts and example transactions
 
@@ -132,6 +132,12 @@ yulsafe/
 ├── test/
 │   ├── YulSafe.t.sol             # Unit test suite (62 tests)
 │   ├── GasBenchmark.t.sol        # Gas comparison tests (16 tests)
+│   ├── invariants/
+│   │   ├── Handler.sol           # Handler for invariant testing
+│   │   └── YulSafeInvariants.t.sol  # Invariant tests (16 tests)
+│   ├── fuzz/
+│   │   ├── RoundingProperties.t.sol # Rounding fuzz tests (19 tests)
+│   │   └── InflationAttack.t.sol    # Inflation attack tests (14 tests)
 │   └── mocks/
 │       ├── MockERC20.sol         # Test token
 │       └── SoladyVault.sol       # Solady ERC4626 wrapper for comparison
@@ -232,7 +238,8 @@ YulSafe successfully demonstrates advanced Solidity optimization techniques with
 - ✅ Up to 59% gas savings on view functions (packed storage)
 - ✅ Production-ready security (ReentrancyGuard, Pausable, First Depositor Protection)
 - ✅ Heavy documentation
-- ✅ **100% test pass rate (78/78), 93% line coverage**
+- ✅ **100% test pass rate (127/127 tests)**
+- ✅ **Comprehensive property-based testing** (invariants + fuzz tests)
 - ✅ Full ERC4626 compliance
 - ✅ Zero compiler errors
 - ✅ Comprehensive fix changelog (fix-issue1.md)
@@ -242,6 +249,6 @@ Ready for Matter Labs engineer review as a technical showcase of protocol engine
 
 ---
 
-**Build Date**: January 14-15, 2026
-**Version**: 1.2.0 (zkSync deployment + verified contracts)
+**Build Date**: January 14-16, 2026
+**Version**: 1.3.0 (Added property-based testing suite)
 **Status**: Complete, tested, deployed, and verified on zkSync Sepolia

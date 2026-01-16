@@ -8,6 +8,12 @@ optimizer_runs = 10_000_000
 via_ir = false
 gas_reports = ["YulSafeERC20", "SoladyVault"]
 
+[invariant]
+runs = 256
+depth = 50
+fail_on_revert = false
+shrink_run_limit = 5000
+
 [profile.zksync]
 src = "src"
 out = "out-zksync"
