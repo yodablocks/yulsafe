@@ -5,7 +5,7 @@
 YulSafe packs the vault's two hot values into one storage slot, does its share math in inline assembly, and emits events with raw LOG opcodes. The result reads state in a single SLOAD and cuts view-function gas by up to 59% against Solady's own ERC4626, while keeping first-depositor protection, reentrancy guards and vault-favoring rounding.
 
 [![CI](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml/badge.svg)](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml)
-![Solidity](https://img.shields.io/badge/Solidity-0.8.24-363636?logo=solidity&logoColor=white)
+![Solidity](https://img.shields.io/badge/Solidity-0.8.37-363636?logo=solidity&logoColor=white)
 ![Foundry](https://img.shields.io/badge/Foundry-forge-FFDB1C)
 ![zkSync Era](https://img.shields.io/badge/zkSync-Era-1E69FF)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
@@ -35,7 +35,7 @@ It is a technical showcase and a usable savings-vault primitive. It is **unaudit
 | **First-depositor protection** | The first deposit mints `MINIMUM_LIQUIDITY` (1000) shares to `address(0)`, permanently locking them and making inflation attacks uneconomic. |
 | **Vault-favoring rounding** | `deposit` and `redeem` round down what the user receives. `mint` and `withdraw` round up what the user pays. Fuzz tests enforce this on every path. |
 | **Guards** | Solady `ReentrancyGuard` on all state changes, owner-only `pause` and `unpause`, zero-amount and zero-address checks. |
-| **Solady base** | ERC20, Ownable, ReentrancyGuard and SafeTransferLib from Solady, vendored in `lib/`. |
+| **Solady base** | ERC20, Ownable, ReentrancyGuard and SafeTransferLib from Solady, vendored in `lib/` at main commit `2afba69`. |
 
 ## Quick start
 
@@ -107,20 +107,20 @@ flowchart LR
 
 ## Gas
 
-Measured with `forge test --gas-report` on the standard EVM, optimizer on at 10,000,000 runs, against Solady's `ERC4626` under the same calls. These have not yet been re-measured on EraVM with zksolc, where storage and call pricing differ.
+Measured with `forge test --gas-report` on the standard EVM, solc 0.8.37 targeting cancun, optimizer on at 10,000,000 runs, against Solady's `ERC4626` under the same calls. These have not yet been re-measured on EraVM with zksolc, where storage and call pricing differ.
 
 | Function | YulSafe | Solady ERC4626 | Change |
 |---|---|---|---|
 | `totalAssets()` | 2,321 | 5,621 | -59% |
-| `convertToShares()` | 4,775 | 8,073 | -41% |
-| `convertToAssets()` | 4,794 | 8,108 | -41% |
-| `deposit()` first | 63,152 | 54,708 | +15% |
-| `deposit()` subsequent | 175,623 | 106,008 | +66% |
-| `mint()` | 63,162 | 54,734 | +15% |
-| `withdraw()` | 61,265 | 54,578 | +12% |
-| `redeem()` | 61,281 | 53,286 | +15% |
+| `convertToShares()` | 4,774 | 8,072 | -41% |
+| `convertToAssets()` | 4,793 | 8,108 | -41% |
+| `deposit()` first | 63,154 | 54,709 | +15% |
+| `deposit()` subsequent | 175,625 | 106,009 | +66% |
+| `mint()` | 63,164 | 54,735 | +15% |
+| `withdraw()` | 61,263 | 54,576 | +12% |
+| `redeem()` | 61,279 | 53,284 | +15% |
 
-Deployment: 1,685,923 gas, 8,328 bytes.
+Deployment: 1,680,590 gas, 8,245 bytes.
 
 The view functions are where the packed slot pays off. State-changing calls cost more than Solady's base vault because they carry a reentrancy guard, a pause check, the minimum-liquidity burn and configurable name and symbol storage, none of which the Solady baseline has.
 
