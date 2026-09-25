@@ -16,12 +16,29 @@ depth = 50
 fail_on_revert = false
 shrink_run_limit = 5000
 
+# zkSync Era: compiled with zksolc through foundry-zksync.
+# Matter Labs' patched solc stops at 0.8.30, so this profile pins it.
+# The invariant harness drives cheatcodes from a non-test contract, which the
+# EraVM emulator does not support, so it is excluded here and covered by the
+# default profile.
 [profile.zksync]
 src = "src"
 out = "out-zksync"
 libs = ["lib"]
-# zkSync VM configuration (requires zkforge or foundry-zksync)
-# vm = "zkSync"
+solc = "0.8.30"
+optimizer = true
+optimizer_runs = 10_000_000
+via_ir = false
+ignored_warnings_from = ["lib"]
+no_match_path = "test/invariants/*"
+fuzz = { runs = 64 }
+
+# zksolc is left unpinned on purpose: pinning it makes the fork fail to
+# fetch the patched solc. foundry-zksync v0.1.4 bundles zksolc 1.5.15.
+[profile.zksync.zksync]
+compile = true
+startup = true
+suppressed_warnings = ["assemblycreate"]
 
 [rpc_endpoints]
 zksync_sepolia = "https://sepolia.era.zksync.dev"
