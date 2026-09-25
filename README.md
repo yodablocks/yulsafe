@@ -2,7 +2,7 @@
 
 **A gas-optimized ERC4626 vault in Solidity and Yul, built on Solady for zkSync Era.**
 
-YulSafe packs the vault's two hot values into one storage slot, does its share math in inline assembly, and emits events with raw LOG opcodes. The result reads state in a single SLOAD and cuts view-function gas by up to 59% against Solady's own ERC4626, while keeping first-depositor protection, reentrancy guards and vault-favoring rounding.
+YulSafe packs the vault's two hot values into one storage slot, does its share math in inline assembly, and emits events with raw LOG opcodes. The result reads state in a single SLOAD and cuts view-function gas by up to 67% against Solady's own ERC4626, while keeping first-depositor protection, reentrancy guards and vault-favoring rounding.
 
 [![CI](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml/badge.svg)](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml)
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.37-363636?logo=solidity&logoColor=white)
@@ -113,26 +113,27 @@ Measured with `forge test --gas-report` on the standard EVM, solc 0.8.37 targeti
 | Function | YulSafe | Solady ERC4626 | Change |
 |---|---|---|---|
 | `totalAssets()` | 2,321 | 5,621 | -59% |
-| `convertToShares()` | 4,774 | 8,072 | -41% |
-| `convertToAssets()` | 4,793 | 8,108 | -41% |
-| `deposit()` first | 63,154 | 54,709 | +15% |
-| `deposit()` subsequent | 175,625 | 106,009 | +66% |
-| `mint()` | 63,164 | 54,735 | +15% |
-| `withdraw()` | 61,263 | 54,576 | +12% |
-| `redeem()` | 61,279 | 53,284 | +15% |
+| `convertToShares()` | 2,674 | 8,072 | -67% |
+| `convertToAssets()` | 2,675 | 8,108 | -67% |
+| `deposit()` first | 63,028 | 54,709 | +15% |
+| `deposit()` subsequent | 175,513 | 106,009 | +66% |
+| `mint()` | 63,078 | 54,735 | +15% |
+| `withdraw()` | 61,279 | 54,576 | +12% |
+| `redeem()` | 61,303 | 53,284 | +15% |
 
-Deployment: 1,680,590 gas, 8,245 bytes.
+Deployment: 1,712,163 gas, 8,391 bytes.
 
 The view functions are where the packed slot pays off. State-changing calls cost more than Solady's base vault because they carry a reentrancy guard, a pause check, the minimum-liquidity burn and configurable name and symbol storage, none of which the Solady baseline has.
 
 ## Tests
 
-130 tests across five suites, run in CI on every push and pull request.
+140 tests across six suites, run in CI on every push and pull request.
 
 | Suite | Tests | Covers |
 |---|---|---|
 | `YulSafe.t.sol` | 62 | ERC4626 conformance, edge cases, access control |
 | `GasBenchmark.t.sol` | 16 | Side-by-side gas against Solady's ERC4626 |
+| `YulSafeHardening.t.sol` | 10 | Input bounds, preview and actual agreement, max functions never revert, consistent views inside token hooks |
 | `invariants/` | 19 | Solvency, share price never decreases, donations never move the price, locked minimum liquidity, no value extraction |
 | `fuzz/RoundingProperties.t.sol` | 19 | Every path rounds in the vault's favor |
 | `fuzz/InflationAttack.t.sol` | 14 | Victims never receive zero shares, attackers lose the locked liquidity |
