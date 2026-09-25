@@ -21,7 +21,7 @@ YulSafe makes three changes and keeps everything else standard:
 
 - **One slot, two values.** `totalAssets` and `totalSupply` live in the same 256-bit word as two 96-bit fields. Every read is one SLOAD, every update is one SSTORE.
 - **Assembly on the hot path.** Share conversions, packing and unpacking, and event emission are written in Yul, so no ABI encoder, no memory expansion, no redundant bounds checks.
-- **Security is not the trade-off.** Minimum liquidity is burned on the first deposit, all rounding favors the vault, and every state-changing function is reentrancy guarded and pausable.
+- **Security is not the trade-off.** The vault never reads its own token balance, so sending tokens to it directly cannot move the share price and the classic ERC4626 donation attack is inert. Minimum liquidity is burned on the first deposit, all rounding favors the vault, and every state-changing function is reentrancy guarded and pausable.
 
 It is a technical showcase and a usable savings-vault primitive. It is **unaudited**. Read the [security policy](SECURITY.md) before touching real funds.
 
@@ -32,7 +32,8 @@ It is a technical showcase and a usable savings-vault primitive. It is **unaudit
 | **ERC4626 interface** | `deposit`, `mint`, `withdraw`, `redeem`, the four `preview*` and four `max*` views, `convertToShares`, `convertToAssets` and `totalAssets`. Shares are a Solady ERC20. |
 | **Packed vault state** | `totalAssets` (96 bits) and `totalSupply` (96 bits) share one slot, with 64 bits reserved. Capacity is about 79 billion tokens at 18 decimals. Overflow reverts with `ExceedsMaxCapacity`. |
 | **Yul hot path** | Conversions use `mul` and `div` directly on the unpacked values. `Deposit` is emitted with `log3` and `Withdraw` with `log4`. Reverts use custom errors raised from assembly. |
-| **First-depositor protection** | The first deposit mints `MINIMUM_LIQUIDITY` (1000) shares to `address(0)`, permanently locking them and making inflation attacks uneconomic. |
+| **Donation resistance** | Share price comes from the packed `totalAssets`, which only changes inside `deposit`, `mint`, `withdraw` and `redeem`. Tokens transferred straight to the contract are ignored by pricing, so a donation cannot inflate or deflate shares. Invariant-tested. |
+| **First-depositor protection** | The first deposit mints `MINIMUM_LIQUIDITY` (1000) shares to `address(0)`, permanently locking them, which closes the rounding edge case on a tiny first deposit. |
 | **Vault-favoring rounding** | `deposit` and `redeem` round down what the user receives. `mint` and `withdraw` round up what the user pays. Fuzz tests enforce this on every path. |
 | **Guards** | Solady `ReentrancyGuard` on all state changes, owner-only `pause` and `unpause`, zero-amount and zero-address checks. |
 | **Solady base** | ERC20, Ownable, ReentrancyGuard and SafeTransferLib from Solady, vendored in `lib/` at main commit `2afba69`. |
@@ -126,18 +127,18 @@ The view functions are where the packed slot pays off. State-changing calls cost
 
 ## Tests
 
-127 tests across five suites, run in CI on every push and pull request.
+130 tests across five suites, run in CI on every push and pull request.
 
 | Suite | Tests | Covers |
 |---|---|---|
 | `YulSafe.t.sol` | 62 | ERC4626 conformance, edge cases, access control |
 | `GasBenchmark.t.sol` | 16 | Side-by-side gas against Solady's ERC4626 |
-| `invariants/` | 16 | Solvency, no shares without assets, locked minimum liquidity, no value extraction |
+| `invariants/` | 19 | Solvency, share price never decreases, donations never move the price, locked minimum liquidity, no value extraction |
 | `fuzz/RoundingProperties.t.sol` | 19 | Every path rounds in the vault's favor |
 | `fuzz/InflationAttack.t.sol` | 14 | Victims never receive zero shares, attackers lose the locked liquidity |
 
 ```sh
-forge test --match-contract YulSafeInvariants --invariant-runs 1000
+FOUNDRY_INVARIANT_RUNS=1000 forge test --match-contract YulSafeInvariants
 forge test --match-path "test/fuzz/*" --fuzz-runs 1000
 ```
 
@@ -153,6 +154,7 @@ zkSync Sepolia, verified on the block explorer.
 ## Limitations
 
 - Standard ERC20 assets only. Fee-on-transfer and rebasing tokens will break the packed accounting.
+- Tokens sent directly to the vault are stranded. Internal accounting is what makes donations harmless, and the flip side is that there is no sweep function and no way to credit them to anyone. A yield strategy would need an explicit, owner-gated function to recognize gains.
 - No yield strategy. The vault holds the asset and does nothing with it.
 - 96-bit totals. A vault that needs more than about 79 billion tokens at 18 decimals cannot use this layout.
 - Owner is a single address with pause power. Use a multisig.
