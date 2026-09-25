@@ -656,10 +656,17 @@ contract YulSafeTest is Test {
     }
 
     /// @notice Test previewMint with zero supply
-    function test_previewMint_zero_supply() public view {
-        // With 0 supply, preview should return shares (1:1 ratio)
-        uint256 assets = vault.previewMint(1000);
-        assertEq(assets, 1000);
+    function test_previewMint_zero_supply() public {
+        // The first mint also pays for the MINIMUM_LIQUIDITY locked to address(0),
+        // and ERC4626 requires previewMint to return no fewer assets than mint charges
+        uint256 previewed = vault.previewMint(1000);
+        assertEq(previewed, 1000 + MINIMUM_LIQUIDITY);
+
+        vm.startPrank(alice);
+        asset.approve(address(vault), type(uint256).max);
+        uint256 charged = vault.mint(1000, alice);
+        vm.stopPrank();
+        assertEq(charged, previewed, "previewMint must match mint");
     }
 
     /// @notice Test previewWithdraw with zero supply
@@ -844,12 +851,17 @@ contract YulSafeTest is Test {
     }
 
     /// @notice Test previewDeposit with zero supply
-    function test_previewDeposit_zero_supply() public view {
-        // With 0 supply, previewDeposit returns 1:1 (it doesn't account for MINIMUM_LIQUIDITY burn)
-        // The actual deposit() will burn MINIMUM_LIQUIDITY, but preview returns raw calculation
-        uint256 shares = vault.previewDeposit(10000);
-        // previewDeposit uses convertToShares which is 1:1 with 0 supply
-        assertEq(shares, 10000);
+    function test_previewDeposit_zero_supply() public {
+        // The first deposit locks MINIMUM_LIQUIDITY, and ERC4626 requires previewDeposit
+        // to return no more shares than deposit actually mints
+        uint256 previewed = vault.previewDeposit(10000);
+        assertEq(previewed, 10000 - MINIMUM_LIQUIDITY);
+
+        vm.startPrank(alice);
+        asset.approve(address(vault), type(uint256).max);
+        uint256 minted = vault.deposit(10000, alice);
+        vm.stopPrank();
+        assertEq(minted, previewed, "previewDeposit must match deposit");
     }
 
     /// @notice Test deposit to different receiver
