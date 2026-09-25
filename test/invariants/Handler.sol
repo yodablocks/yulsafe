@@ -22,6 +22,12 @@ contract Handler is Test {
     uint256 public ghost_mintSharesSum;
     uint256 public ghost_redeemSharesSum;
 
+    // Share price tracking. A violation counter persists across the whole
+    // call sequence, so the invariant harness can assert it stayed at zero.
+    uint256 public ghost_priceDecreases;
+    uint256 public ghost_donationPriceChanges;
+    uint256 public ghost_donationSum;
+
     // Call counters for debugging
     uint256 public calls_deposit;
     uint256 public calls_withdraw;
@@ -30,6 +36,21 @@ contract Handler is Test {
 
     uint256 constant MINIMUM_LIQUIDITY = 1000;
     uint256 constant MAX_96_BITS = 0xFFFFFFFFFFFFFFFFFFFFFFFF;
+
+    /// @dev Share price is totalAssets / totalSupply. Compare as a cross product
+    ///      so integer rounding cannot hide a real decrease.
+    modifier trackPrice() {
+        uint256 assetsBefore = vault.totalAssets();
+        uint256 supplyBefore = vault.totalSupply();
+        _;
+        uint256 assetsAfter = vault.totalAssets();
+        uint256 supplyAfter = vault.totalSupply();
+        if (supplyBefore > 0 && supplyAfter > 0) {
+            if (assetsAfter * supplyBefore < assetsBefore * supplyAfter) {
+                ghost_priceDecreases++;
+            }
+        }
+    }
 
     modifier useActor(uint256 actorIndexSeed) {
         currentActor = actors[bound(actorIndexSeed, 0, actors.length - 1)];
@@ -67,7 +88,7 @@ contract Handler is Test {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Bounded deposit action
-    function deposit(uint256 actorSeed, uint256 assets) external useActor(actorSeed) {
+    function deposit(uint256 actorSeed, uint256 assets) external useActor(actorSeed) trackPrice {
         // Bound assets to valid range
         uint256 currentAssets = vault.totalAssets();
         uint256 maxDeposit = MAX_96_BITS > currentAssets ? MAX_96_BITS - currentAssets : 0;
@@ -91,7 +112,7 @@ contract Handler is Test {
     }
 
     /// @notice Bounded mint action
-    function mint(uint256 actorSeed, uint256 shares) external useActor(actorSeed) {
+    function mint(uint256 actorSeed, uint256 shares) external useActor(actorSeed) trackPrice {
         // Bound shares to valid range
         uint256 currentSupply = vault.totalSupply();
         uint256 maxMint = MAX_96_BITS > currentSupply ? MAX_96_BITS - currentSupply : 0;
@@ -120,7 +141,7 @@ contract Handler is Test {
     }
 
     /// @notice Bounded withdraw action
-    function withdraw(uint256 actorSeed, uint256 assets) external useActor(actorSeed) {
+    function withdraw(uint256 actorSeed, uint256 assets) external useActor(actorSeed) trackPrice {
         uint256 maxWithdraw = vault.maxWithdraw(currentActor);
 
         if (maxWithdraw == 0) return;
@@ -136,7 +157,7 @@ contract Handler is Test {
     }
 
     /// @notice Bounded redeem action
-    function redeem(uint256 actorSeed, uint256 shares) external useActor(actorSeed) {
+    function redeem(uint256 actorSeed, uint256 shares) external useActor(actorSeed) trackPrice {
         uint256 maxRedeem = vault.maxRedeem(currentActor);
 
         if (maxRedeem == 0) return;
@@ -168,14 +189,24 @@ contract Handler is Test {
     }
 
     /// @notice Simulate direct token transfer to vault (donation attack vector)
-    function donate(uint256 actorSeed, uint256 amount) external useActor(actorSeed) {
+    function donate(uint256 actorSeed, uint256 amount) external useActor(actorSeed) trackPrice {
         // Bound donation to reasonable amount
         amount = bound(amount, 0, 1000 ether);
 
         if (asset.balanceOf(currentActor) < amount) return;
 
+        uint256 assetsBefore = vault.totalAssets();
+        uint256 supplyBefore = vault.totalSupply();
+
         // Direct transfer to vault (not through deposit)
         assertTrue(asset.transfer(address(vault), amount));
+        ghost_donationSum += amount;
+
+        // The vault prices shares from its packed accounting, never from
+        // balanceOf, so a donation must leave both totals exactly unchanged.
+        if (vault.totalAssets() != assetsBefore || vault.totalSupply() != supplyBefore) {
+            ghost_donationPriceChanges++;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
