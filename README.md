@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-blue)](https://soliditylang.org/)
-[![Tests](https://img.shields.io/badge/Tests-127%2F127_passing-brightgreen)](https://github.com/yodablocks/yulsafe)
+[![CI](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml/badge.svg)](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml)
 
 > **⚡ Up to 59% gas savings on view functions** through packed storage and Yul optimization
 
