@@ -77,7 +77,7 @@ contract InflationAttack is Test {
         // Step 2: Attacker donates directly to vault to inflate share price
         if (donation > 0) {
             vm.prank(attacker);
-            asset.transfer(address(vault), donation);
+            assertTrue(asset.transfer(address(vault), donation));
         }
 
         // Step 3: Victim deposits
@@ -105,7 +105,7 @@ contract InflationAttack is Test {
 
         if (donation > 0) {
             vm.prank(attacker);
-            asset.transfer(address(vault), donation);
+            assertTrue(asset.transfer(address(vault), donation));
         }
 
         // Victim deposits
@@ -145,7 +145,7 @@ contract InflationAttack is Test {
 
         // Attacker donates
         vm.prank(attacker);
-        asset.transfer(address(vault), donation);
+        assertTrue(asset.transfer(address(vault), donation));
 
         // Attacker's cost so far
         uint256 attackerCost = attackerDeposit + donation;
@@ -199,7 +199,7 @@ contract InflationAttack is Test {
         // Attacker donates 10x victim's deposit (extreme case)
         uint256 massiveDonation = uint256(victimDeposit) * 10;
         vm.prank(attacker);
-        asset.transfer(address(vault), massiveDonation);
+        assertTrue(asset.transfer(address(vault), massiveDonation));
 
         // Victim still gets shares
         vm.prank(victim);
@@ -223,7 +223,7 @@ contract InflationAttack is Test {
         // Multiple donations
         for (uint256 i = 0; i < donationCount; i++) {
             vm.prank(attacker);
-            asset.transfer(address(vault), 1 ether);
+            assertTrue(asset.transfer(address(vault), 1 ether));
         }
 
         // Victim deposits
@@ -305,7 +305,7 @@ contract InflationAttack is Test {
 
         if (donation > 0) {
             vm.prank(attacker);
-            asset.transfer(address(vault), donation);
+            assertTrue(asset.transfer(address(vault), donation));
         }
 
         // Victim deposits and immediately redeems
@@ -339,7 +339,7 @@ contract InflationAttack is Test {
         vm.startPrank(attacker);
         vault.deposit(attackerDeposit, attacker);
         if (frontrunDonation > 0) {
-            asset.transfer(address(vault), frontrunDonation);
+            assertTrue(asset.transfer(address(vault), frontrunDonation));
         }
         vm.stopPrank();
 
@@ -427,11 +427,13 @@ contract InflationAttack is Test {
 
         if (donation > 0) {
             vm.prank(attacker);
-            asset.transfer(address(vault), donation);
+            assertTrue(asset.transfer(address(vault), donation));
         }
 
         // Multiple victims deposit
         for (uint256 i = 0; i < victimCount; i++) {
+            // i is bounded to at most 10 by victimCount above, so 0x71C + i fits in uint160
+            // forge-lint: disable-next-line(unsafe-typecast)
             address currentVictim = address(uint160(0x71C + i));
             asset.mint(currentVictim, 100 ether);
 
@@ -457,7 +459,7 @@ contract InflationAttack is Test {
         vault.deposit(attackerDeposit, attacker);
 
         vm.prank(attacker);
-        asset.transfer(address(vault), donation);
+        assertTrue(asset.transfer(address(vault), donation));
 
         // First victim
         address victim1 = address(0x71C1);
