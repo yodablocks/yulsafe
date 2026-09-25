@@ -178,6 +178,8 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256 shares)
     {
+        bool isFirstDeposit;
+
         // Assembly block for gas-optimized validation and share calculation
         assembly {
             // 1. Check paused state (OPTIMIZATION D: Direct SLOAD)
@@ -205,7 +207,7 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             // 3. Check capacity (96-bit limit for packed storage)
             if gt(assets, MAX_96_BITS) {
                 // Custom error: ExceedsMaxCapacity()
-                mstore(0x00, 0x83920801)
+                mstore(0x00, 0x2ba549be)
                 revert(0x1c, 0x04)
             }
 
@@ -241,13 +243,14 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
                 // 2. MINIMUM_LIQUIDITY shares burned to address(0) forever
                 // 3. Share price manipulation becomes expensive
 
-                shares := sub(assets, MINIMUM_LIQUIDITY)
-
-                // Ensure first deposit is large enough
-                if iszero(shares) {
+                // The first deposit must exceed the locked liquidity, otherwise
+                // the subtraction below would wrap
+                if iszero(gt(assets, MINIMUM_LIQUIDITY)) {
                     mstore(0x00, 0x39996567) // InsufficientShares()
                     revert(0x1c, 0x04)
                 }
+                shares := sub(assets, MINIMUM_LIQUIDITY)
+                isFirstDeposit := 1
 
                 // Update packed state for first deposit
                 // totalAssets = assets
@@ -283,7 +286,7 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
 
                 // Check for overflow of 96-bit storage
                 if or(gt(newAssets, MAX_96_BITS), gt(newSupply, MAX_96_BITS)) {
-                    mstore(0x00, 0x83920801) // ExceedsMaxCapacity()
+                    mstore(0x00, 0x2ba549be) // ExceedsMaxCapacity()
                     revert(0x1c, 0x04)
                 }
 
@@ -312,21 +315,16 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             )
         }
 
-        // 7. Check if this is first deposit (before transfers/mints)
-        bool isFirstDeposit = (totalSupply() == 0);
-
-        // 8. Transfer assets from caller using SafeTransferLib
-        // This uses Solady's optimized transfer which is already in assembly
-        // Checks-Effects-Interactions pattern: state updated before external call
-        asset.safeTransferFrom(msg.sender, address(this), assets);
-
-        // 9. Handle first deposit minimum liquidity FIRST
+        // 7. Mint shares before the external call, so every view, including
+        // one made from inside a token transfer hook, sees the final state.
+        // A failed transfer reverts the mint along with everything else.
         if (isFirstDeposit) {
             _mint(address(0), MINIMUM_LIQUIDITY);
         }
-
-        // 10. Mint shares to receiver
         _mint(receiver, shares);
+
+        // 8. Pull assets from caller using SafeTransferLib (interaction last)
+        asset.safeTransferFrom(msg.sender, address(this), assets);
     }
 
     /// @notice Mint exact shares by depositing assets
@@ -340,6 +338,8 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256 assets)
     {
+        bool isFirstMint;
+
         assembly {
             // 1. Check paused state
             if sload(_paused.slot) {
@@ -368,22 +368,40 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             switch _totalSupply
             case 0 {
                 // First mint: 1:1 ratio + minimum liquidity
+                // Bound shares first so the addition cannot wrap, then bound
+                // the packed field so the two 96-bit lanes cannot overlap
+                if gt(shares, MAX_96_BITS) {
+                    mstore(0x00, 0x2ba549be) // ExceedsMaxCapacity()
+                    revert(0x1c, 0x04)
+                }
                 assets := add(shares, MINIMUM_LIQUIDITY)
+                if gt(assets, MAX_96_BITS) {
+                    mstore(0x00, 0x2ba549be) // ExceedsMaxCapacity()
+                    revert(0x1c, 0x04)
+                }
+                isFirstMint := 1
 
                 let newPacked := or(assets, shl(96, assets))
                 sstore(_packedVaultState.slot, newPacked)
             }
             default {
-                // Calculate assets needed (round up)
+                // Bound shares so the multiplication below cannot wrap
+                if gt(shares, MAX_96_BITS) {
+                    mstore(0x00, 0x2ba549be) // ExceedsMaxCapacity()
+                    revert(0x1c, 0x04)
+                }
+
+                // Calculate assets needed, rounding up only when inexact,
+                // so that previewMint and mint agree
                 let numerator := mul(shares, _totalAssets)
-                assets := add(div(numerator, _totalSupply), 1)
+                assets := add(div(numerator, _totalSupply), iszero(iszero(mod(numerator, _totalSupply))))
 
                 // Update state
                 let newAssets := add(_totalAssets, assets)
                 let newSupply := add(_totalSupply, shares)
 
                 if or(gt(newAssets, MAX_96_BITS), gt(newSupply, MAX_96_BITS)) {
-                    mstore(0x00, 0x83920801) // ExceedsMaxCapacity()
+                    mstore(0x00, 0x2ba549be) // ExceedsMaxCapacity()
                     revert(0x1c, 0x04)
                 }
 
@@ -403,18 +421,14 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             )
         }
 
-        // Check if first mint
-        bool isFirstMint = (totalSupply() == 0);
-
-        // Transfer assets and mint shares
-        asset.safeTransferFrom(msg.sender, address(this), assets);
-
-        // Handle first mint minimum liquidity FIRST
+        // Mint shares before the external call, see deposit()
         if (isFirstMint) {
             _mint(address(0), MINIMUM_LIQUIDITY);
         }
-
         _mint(receiver, shares);
+
+        // Pull assets from caller (interaction last)
+        asset.safeTransferFrom(msg.sender, address(this), assets);
     }
 
     /// @notice Withdraw exact assets by burning shares
@@ -457,11 +471,11 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             }
 
             // 5. Calculate shares to burn
-            // shares = (assets * _totalSupply) / _totalAssets
-            // ROUND UP to favor vault (user burns slightly more shares)
-            // This prevents rounding exploits where users withdraw more than they should
+            // shares = ceil(assets * _totalSupply / _totalAssets)
+            // ROUND UP to favor vault, but only when the division is inexact,
+            // so that previewWithdraw, maxWithdraw and withdraw agree
             let numerator := mul(assets, _totalSupply)
-            shares := add(div(numerator, _totalAssets), 1)
+            shares := add(div(numerator, _totalAssets), iszero(iszero(mod(numerator, _totalAssets))))
 
             // Ensure shares > 0
             if iszero(shares) {
@@ -534,7 +548,13 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             let _totalAssets := and(packed, MASK_96)
             let _totalSupply := and(shr(96, packed), MASK_96)
 
-            // 4. Calculate assets to withdraw
+            // 4. Check sufficient shares, which also bounds the multiplication
+            if gt(shares, _totalSupply) {
+                mstore(0x00, 0x39996567) // InsufficientShares()
+                revert(0x1c, 0x04)
+            }
+
+            // 5. Calculate assets to withdraw
             // assets = (shares * _totalAssets) / _totalSupply
             // ROUND DOWN to favor vault (user gets slightly less)
             let numerator := mul(shares, _totalAssets)
@@ -591,53 +611,70 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
         }
     }
 
+    /// @dev Read both totals from the packed slot in one SLOAD. Every view
+    ///      prices from the same word the write path updates atomically, so
+    ///      no caller, including one reentering from a token hook, can observe
+    ///      totalAssets and totalSupply from different points in time.
+    function _vaultState() private view returns (uint256 assets_, uint256 supply_) {
+        uint256 packed = _packedVaultState;
+        assembly {
+            assets_ := and(packed, MASK_96)
+            supply_ := and(shr(96, packed), MASK_96)
+        }
+    }
+
     /// @notice Convert assets to shares
     /// @param assets Amount of assets
     /// @return Amount of shares
     function convertToShares(uint256 assets) public view virtual returns (uint256) {
-        uint256 supply = totalSupply();
-        if (supply == 0) return assets;
+        (uint256 assets_, uint256 supply_) = _vaultState();
+        if (supply_ == 0) return assets;
 
-        return (assets * supply) / totalAssets();
+        return (assets * supply_) / assets_;
     }
 
     /// @notice Convert shares to assets
     /// @param shares Amount of shares
     /// @return Amount of assets
     function convertToAssets(uint256 shares) public view virtual returns (uint256) {
-        uint256 supply = totalSupply();
-        if (supply == 0) return shares;
+        (uint256 assets_, uint256 supply_) = _vaultState();
+        if (supply_ == 0) return shares;
 
-        return (shares * totalAssets()) / supply;
+        return (shares * assets_) / supply_;
     }
 
     /// @notice Preview deposit shares
     /// @param assets Amount of assets to deposit
     /// @return Amount of shares that would be minted
     function previewDeposit(uint256 assets) public view virtual returns (uint256) {
-        return convertToShares(assets);
+        (uint256 assets_, uint256 supply_) = _vaultState();
+        // The first deposit locks MINIMUM_LIQUIDITY, so preview what deposit mints
+        if (supply_ == 0) return assets > MINIMUM_LIQUIDITY ? assets - MINIMUM_LIQUIDITY : 0;
+
+        return (assets * supply_) / assets_;
     }
 
     /// @notice Preview mint assets needed
     /// @param shares Amount of shares to mint
     /// @return Amount of assets needed
     function previewMint(uint256 shares) public view virtual returns (uint256) {
-        uint256 supply = totalSupply();
-        if (supply == 0) return shares;
+        (uint256 assets_, uint256 supply_) = _vaultState();
+        // The first mint also pays for the locked MINIMUM_LIQUIDITY
+        if (supply_ == 0) return shares + MINIMUM_LIQUIDITY;
 
         // Round up
-        return (shares * totalAssets() + supply - 1) / supply;
+        return (shares * assets_ + supply_ - 1) / supply_;
     }
 
     /// @notice Preview withdraw shares needed
     /// @param assets Amount of assets to withdraw
     /// @return Amount of shares that would be burned
     function previewWithdraw(uint256 assets) public view virtual returns (uint256) {
-        uint256 supply = totalSupply();
-        if (supply == 0) return assets;
+        (uint256 assets_, uint256 supply_) = _vaultState();
+        if (supply_ == 0) return assets;
 
         // Round up
-        return (assets * supply + totalAssets() - 1) / totalAssets();
+        return (assets * supply_ + assets_ - 1) / assets_;
     }
 
     /// @notice Preview redeem assets returned
@@ -658,7 +695,8 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
     /// @return Maximum mint amount
     function maxMint(address) public view virtual returns (uint256) {
         if (_paused != 0) return 0;
-        return MAX_96_BITS - totalSupply();
+        (, uint256 supply_) = _vaultState();
+        return MAX_96_BITS - supply_;
     }
 
     /// @notice Maximum withdraw for user
