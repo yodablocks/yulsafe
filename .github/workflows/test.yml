@@ -32,3 +32,25 @@ jobs:
 
       - name: Test
         run: forge test -vvv
+
+  zksync:
+    name: zkSync Era build and test (zksolc)
+    runs-on: ubuntu-latest
+    env:
+      FOUNDRY_PROFILE: zksync
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Foundry-ZKsync
+        uses: dutterbutter/foundry-zksync-toolchain@v2
+        with:
+          version: latest
+
+      - name: Show Forge version
+        run: forge --version
+
+      - name: Build with zksolc
+        run: forge build --sizes
+
+      - name: Test on EraVM
+        run: forge test -vvv
