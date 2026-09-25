@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.30;
 
 /// @notice Arithmetic library with operations for fixed-point numbers.
 /// @author Solady (https://github.com/vectorized/solady/blob/main/src/utils/FixedPointMathLib.sol)
@@ -75,7 +75,7 @@ library FixedPointMathLib {
         }
     }
 
-    /// @dev Equivalent to `(x * y) / WAD` rounded towards zero.
+    /// @dev Equivalent to `(x * y) / WAD` rounded down.
     function sMulWad(int256 x, int256 y) internal pure returns (int256 z) {
         /// @solidity memory-safe-assembly
         assembly {
@@ -97,7 +97,7 @@ library FixedPointMathLib {
         }
     }
 
-    /// @dev Equivalent to `(x * y) / WAD` rounded towards zero, but without overflow checks.
+    /// @dev Equivalent to `(x * y) / WAD` rounded down, but without overflow checks.
     function rawSMulWad(int256 x, int256 y) internal pure returns (int256 z) {
         /// @solidity memory-safe-assembly
         assembly {
@@ -142,7 +142,7 @@ library FixedPointMathLib {
         }
     }
 
-    /// @dev Equivalent to `(x * WAD) / y` rounded towards zero.
+    /// @dev Equivalent to `(x * WAD) / y` rounded down.
     function sDivWad(int256 x, int256 y) internal pure returns (int256 z) {
         /// @solidity memory-safe-assembly
         assembly {
@@ -164,7 +164,7 @@ library FixedPointMathLib {
         }
     }
 
-    /// @dev Equivalent to `(x * WAD) / y` rounded towards zero, but without overflow and divide by zero checks.
+    /// @dev Equivalent to `(x * WAD) / y` rounded down, but without overflow and divide by zero checks.
     function rawSDivWad(int256 x, int256 y) internal pure returns (int256 z) {
         /// @solidity memory-safe-assembly
         assembly {
@@ -277,26 +277,18 @@ library FixedPointMathLib {
     function lnWad(int256 x) internal pure returns (int256 r) {
         /// @solidity memory-safe-assembly
         assembly {
-            // We want to convert `x` from `10**18` fixed point to `2**96` fixed point.
-            // We do this by multiplying by `2**96 / 10**18`. But since
-            // `ln(x * C) = ln(x) + ln(C)`, we can simply do nothing here
-            // and add `ln(2**96 / 10**18)` at the end.
-
-            // Compute `k = log2(x) - 96`, `r = 159 - k = 255 - log2(x) = 255 ^ log2(x)`.
-            r := shl(7, lt(0xffffffffffffffffffffffffffffffff, x))
-            r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, x))))
-            r := or(r, shl(5, lt(0xffffffff, shr(r, x))))
-            r := or(r, shl(4, lt(0xffff, shr(r, x))))
-            r := or(r, shl(3, lt(0xff, shr(r, x))))
-            // We place the check here for more optimal stack operations.
             if iszero(sgt(x, 0)) {
                 mstore(0x00, 0x1615e638) // `LnWadUndefined()`.
                 revert(0x1c, 0x04)
             }
-            // forgefmt: disable-next-item
-            r := xor(r, byte(and(0x1f, shr(shr(r, x), 0x8421084210842108cc6318c6db6d54be)),
-                0xf8f9f9faf9fdfafbf9fdfcfdfafbfcfef9fafdfafcfcfbfefafafcfbffffffff))
 
+            // We want to convert `x` from `10**18` fixed point to `2**96` fixed point.
+            // We do this by multiplying by `2**96 / 10**18`. But since
+            // `ln(x * C) = ln(x) + ln(C)`, we can simply do nothing here
+            // and add `ln(2**96 / 10**18)` at the end.
+            // Compute `k = log2(x) - 96`, `r = 159 - k = 255 - log2(x) = 255 - (255 - clz(x))
+            // then k = clz(x)`.
+            r := clz(x)
             // Reduce range of x to (1, 2) * 2**96
             // ln(2^k * x) = k * ln(2) + ln(x)
             x := shr(159, shl(r, x))
@@ -489,7 +481,7 @@ library FixedPointMathLib {
                     // Invert `d mod 2**256`
                     // Now that `d` is an odd number, it has an inverse
                     // modulo `2**256` such that `d * inv = 1 mod 2**256`.
-                    // Compute the inverse by starting with a seed that is
+                    // Compute the inverse by starting with a seed that is correct
                     // correct for four bits. That is, `d * inv = 1 mod 2**4`.
                     let inv := xor(2, mul(3, d))
                     // Now use Newton-Raphson iteration to improve the precision.
@@ -778,42 +770,20 @@ library FixedPointMathLib {
     function sqrt(uint256 x) internal pure returns (uint256 z) {
         /// @solidity memory-safe-assembly
         assembly {
-            // `floor(sqrt(2**15)) = 181`. `sqrt(2**15) - 181 = 2.84`.
-            z := 181 // The "correct" value is 1, but this saves a multiplication later.
+            // Step 1: Get the bit position of the most significant bit
+            // n = floor(log2(x))
+            // For x ≈ 2^n, we know sqrt(x) ≈ 2^(n/2)
+            // We use (n+1)/2 instead of n/2 to round up slightly
+            // This gives a better initial approximation. This seed gives
+            // ε₁ = 0.0607 after one Babylonian step for all inputs. With
+            // ε_{n+1} ≈ ε²/2, 6 steps yield 2⁻¹⁶⁰ relative error (>128 correct
+            // bits).
+            //
+            // Formula: z = 2^((n+1)/2) = 2^(floor((n+1)/2))
+            // Implemented as: z = 1 << ((n+1) >> 1)
+            z := shl(shr(1, sub(256, clz(x))), 1)
 
-            // This segment is to get a reasonable initial estimate for the Babylonian method. With a bad
-            // start, the correct # of bits increases ~linearly each iteration instead of ~quadratically.
-
-            // Let `y = x / 2**r`. We check `y >= 2**(k + 8)`
-            // but shift right by `k` bits to ensure that if `x >= 256`, then `y >= 256`.
-            let r := shl(7, lt(0xffffffffffffffffffffffffffffffffff, x))
-            r := or(r, shl(6, lt(0xffffffffffffffffff, shr(r, x))))
-            r := or(r, shl(5, lt(0xffffffffff, shr(r, x))))
-            r := or(r, shl(4, lt(0xffffff, shr(r, x))))
-            z := shl(shr(1, r), z)
-
-            // Goal was to get `z*z*y` within a small factor of `x`. More iterations could
-            // get y in a tighter range. Currently, we will have y in `[256, 256*(2**16))`.
-            // We ensured `y >= 256` so that the relative difference between `y` and `y+1` is small.
-            // That's not possible if `x < 256` but we can just verify those cases exhaustively.
-
-            // Now, `z*z*y <= x < z*z*(y+1)`, and `y <= 2**(16+8)`, and either `y >= 256`, or `x < 256`.
-            // Correctness can be checked exhaustively for `x < 256`, so we assume `y >= 256`.
-            // Then `z*sqrt(y)` is within `sqrt(257)/sqrt(256)` of `sqrt(x)`, or about 20bps.
-
-            // For `s` in the range `[1/256, 256]`, the estimate `f(s) = (181/1024) * (s+1)`
-            // is in the range `(1/2.84 * sqrt(s), 2.84 * sqrt(s))`,
-            // with largest error when `s = 1` and when `s = 256` or `1/256`.
-
-            // Since `y` is in `[256, 256*(2**16))`, let `a = y/65536`, so that `a` is in `[1/256, 256)`.
-            // Then we can estimate `sqrt(y)` using
-            // `sqrt(65536) * 181/1024 * (a + 1) = 181/4 * (y + 65536)/65536 = 181 * (y + 65536)/2**18`.
-
-            // There is no overflow risk here since `y < 2**136` after the first branch above.
-            z := shr(18, mul(z, add(shr(r, x), 65536))) // A `mul()` is saved from starting `z` at 181.
-
-            // Given the worst case multiplicative error of 2.84 above, 7 iterations should be enough.
-            z := shr(1, add(z, div(x, z)))
+            // 6 Babylonian steps; z = (x/z + z) / 2
             z := shr(1, add(z, div(x, z)))
             z := shr(1, add(z, div(x, z)))
             z := shr(1, add(z, div(x, z)))
@@ -831,26 +801,26 @@ library FixedPointMathLib {
     /// @dev Returns the cube root of `x`, rounded down.
     /// Credit to bout3fiddy and pcaversaccio under AGPLv3 license:
     /// https://github.com/pcaversaccio/snekmate/blob/main/src/snekmate/utils/math.vy
-    /// Formally verified by xuwinnie:
-    /// https://github.com/vectorized/solady/blob/main/audits/xuwinnie-solady-cbrt-proof.pdf
+    /// Credit to duncancmt
+    /// https://github.com/0xProject/0x-settler/blob/2577ae61a3ca26a5b37ef8769b05f05de5115e93/src/vendor/Cbrt.sol
     function cbrt(uint256 x) internal pure returns (uint256 z) {
         /// @solidity memory-safe-assembly
         assembly {
-            let r := shl(7, lt(0xffffffffffffffffffffffffffffffff, x))
-            r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, x))))
-            r := or(r, shl(5, lt(0xffffffff, shr(r, x))))
-            r := or(r, shl(4, lt(0xffff, shr(r, x))))
-            r := or(r, shl(3, lt(0xff, shr(r, x))))
-            // Makeshift lookup table to nudge the approximate log2 result.
-            z := div(shl(div(r, 3), shl(lt(0xf, shr(r, x)), 0xf)), xor(7, mod(r, 3)))
-            // Newton-Raphson's.
+            // Initial guess z ≈ c · 2^q where b = ⌊log₂(x) + 2⌋, q = ⌊b / 3⌋. The
+            // 8-bit fixed-point multipliers `c`: 90/128, 116/128, and 142/128
+            // are selected by `b mod 3` to balance each octave's worst-case
+            // final error. This gives >94 bits of precision after only 5
+            // Newton-Raphson iterations.
+            z := sub(257, clz(x))
+            z := shr(7, shl(div(z, 3), add(90, mul(26, mod(z, 3)))))
+
+            // 5 Newton-Raphson iterations
             z := div(add(add(div(x, mul(z, z)), z), z), 3)
             z := div(add(add(div(x, mul(z, z)), z), z), 3)
             z := div(add(add(div(x, mul(z, z)), z), z), 3)
             z := div(add(add(div(x, mul(z, z)), z), z), 3)
             z := div(add(add(div(x, mul(z, z)), z), z), 3)
-            z := div(add(add(div(x, mul(z, z)), z), z), 3)
-            z := div(add(add(div(x, mul(z, z)), z), z), 3)
+
             // Round down.
             z := sub(z, lt(div(x, mul(z, z)), z))
         }
@@ -927,14 +897,7 @@ library FixedPointMathLib {
     function log2(uint256 x) internal pure returns (uint256 r) {
         /// @solidity memory-safe-assembly
         assembly {
-            r := shl(7, lt(0xffffffffffffffffffffffffffffffff, x))
-            r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, x))))
-            r := or(r, shl(5, lt(0xffffffff, shr(r, x))))
-            r := or(r, shl(4, lt(0xffff, shr(r, x))))
-            r := or(r, shl(3, lt(0xff, shr(r, x))))
-            // forgefmt: disable-next-item
-            r := or(r, byte(and(0x1f, shr(shr(r, x), 0x8421084210842108cc6318c6db6d54be)),
-                0x0706060506020504060203020504030106050205030304010505030400000000))
+            r := sub(255, clz(or(x, 1)))
         }
     }
 
@@ -953,23 +916,8 @@ library FixedPointMathLib {
     function log10(uint256 x) internal pure returns (uint256 r) {
         /// @solidity memory-safe-assembly
         assembly {
-            if iszero(lt(x, 100000000000000000000000000000000000000)) {
-                x := div(x, 100000000000000000000000000000000000000)
-                r := 38
-            }
-            if iszero(lt(x, 100000000000000000000)) {
-                x := div(x, 100000000000000000000)
-                r := add(r, 20)
-            }
-            if iszero(lt(x, 10000000000)) {
-                x := div(x, 10000000000)
-                r := add(r, 10)
-            }
-            if iszero(lt(x, 100000)) {
-                x := div(x, 100000)
-                r := add(r, 5)
-            }
-            r := add(r, add(gt(x, 9), add(gt(x, 99), add(gt(x, 999), gt(x, 9999)))))
+            r := shr(12, mul(1233, sub(256, clz(x))))
+            r := add(sub(iszero(x), lt(x, exp(10, r))), r)
         }
     }
 
@@ -988,11 +936,7 @@ library FixedPointMathLib {
     function log256(uint256 x) internal pure returns (uint256 r) {
         /// @solidity memory-safe-assembly
         assembly {
-            r := shl(7, lt(0xffffffffffffffffffffffffffffffff, x))
-            r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, x))))
-            r := or(r, shl(5, lt(0xffffffff, shr(r, x))))
-            r := or(r, shl(4, lt(0xffff, shr(r, x))))
-            r := or(shr(3, r), lt(0xff, shr(r, x)))
+            r := shr(3, sub(255, clz(or(x, 1))))
         }
     }
 
@@ -1178,7 +1122,7 @@ library FixedPointMathLib {
     /// @dev Returns `a + (b - a) * (t - begin) / (end - begin)`,
     /// with `t` clamped between `begin` and `end` (inclusive).
     /// Agnostic to the order of (`a`, `b`) and (`end`, `begin`).
-    /// If `begin == end`, returns `t <= begin ? a : b`.
+    /// If `begins == end`, returns `t <= begin ? a : b`.
     function lerp(uint256 a, uint256 b, uint256 t, uint256 begin, uint256 end)
         internal
         pure
@@ -1196,7 +1140,7 @@ library FixedPointMathLib {
     /// @dev Returns `a + (b - a) * (t - begin) / (end - begin)`.
     /// with `t` clamped between `begin` and `end` (inclusive).
     /// Agnostic to the order of (`a`, `b`) and (`end`, `begin`).
-    /// If `begin == end`, returns `t <= begin ? a : b`.
+    /// If `begins == end`, returns `t <= begin ? a : b`.
     function lerp(int256 a, int256 b, int256 t, int256 begin, int256 end)
         internal
         pure

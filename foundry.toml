@@ -2,10 +2,12 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-solc = "0.8.24"
+solc = "0.8.37"
+evm_version = "cancun"
 optimizer = true
 optimizer_runs = 10_000_000
 via_ir = false
+ignored_warnings_from = ["lib"]
 gas_reports = ["YulSafeERC20", "SoladyVault"]
 
 [invariant]
@@ -33,8 +35,10 @@ zksync_sepolia = { key = "${ZKSYNC_ETHERSCAN_API_KEY}", url = "https://api-sepol
 src = "src"
 out = "out"
 libs = ["lib"]
-solc = "0.8.24"
+solc = "0.8.37"
+evm_version = "cancun"
 optimizer = true
 optimizer_runs = 10_000_000
 via_ir = false
+ignored_warnings_from = ["lib"]
 fuzz = { runs = 512 }

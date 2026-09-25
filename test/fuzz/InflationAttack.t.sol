@@ -173,13 +173,23 @@ contract InflationAttack is Test {
         // They can never recover the value of those burned shares
         uint256 attackerPermanentLoss = vault.convertToAssets(MINIMUM_LIQUIDITY);
 
-        // Key insight: attacker permanently loses MINIMUM_LIQUIDITY worth of shares
-        // This must be factored into their "profit"
-        assertGe(
-            attackerPermanentLoss,
-            0, // Always true, but documents the protection mechanism
-            "Attacker has no permanent loss - protection failed"
+        // The attacker paid deposit + donation out of their own balance
+        assertEq(
+            asset.balanceOf(attacker),
+            attackerInitialBalance - attackerCost,
+            "Attacker balance does not reflect deposit plus donation"
         );
+
+        // Donations never enter the packed totalAssets, so the attacker can
+        // redeem at most their deposit minus the burned MINIMUM_LIQUIDITY,
+        // which is strictly less than what the attack cost them
+        assertLt(attackerRedeemValue, attackerCost, "Attacker profited from the attack");
+
+        // For the same reason the victim's shares are priced exactly at par
+        assertEq(victimLoss, 0, "Victim lost value to the donation");
+
+        // The burned shares are worth something and are gone for good
+        assertGt(attackerPermanentLoss, 0, "Burned MINIMUM_LIQUIDITY has no value");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -360,7 +370,7 @@ contract InflationAttack is Test {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Property: Minimum attack cost is MINIMUM_LIQUIDITY tokens
-    function test_minimumAttackCost() public {
+    function test_minimumAttackCost() public pure {
         // To execute any inflation attack, attacker must first deposit
         // The minimum deposit is MINIMUM_LIQUIDITY + 1
         // And MINIMUM_LIQUIDITY shares are burned forever

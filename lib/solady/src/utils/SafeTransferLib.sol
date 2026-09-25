@@ -455,7 +455,7 @@ library SafeTransferLib {
     }
 
     /// @dev Performs a `token.balanceOf(account)` check.
-    /// `implemented` denotes whether the `token` does not implement `balanceOf`.
+    /// `implemented` denotes whether the `token` implements `balanceOf`.
     /// `amount` is zero if the `token` does not implement `balanceOf`.
     function checkBalanceOf(address token, address account)
         internal
@@ -654,7 +654,7 @@ library SafeTransferLib {
             mstore(add(m, 0x40), and(addressMask, spender))
             mstore(add(m, 0x60), and(addressMask, amount))
             mstore(add(m, 0x80), and(0xffffffffffff, expiration))
-            if iszero(call(gas(), PERMIT2, 0, add(m, 0x1c), 0xa0, codesize(), 0x00)) {
+            if iszero(call(gas(), PERMIT2, 0, add(m, 0x1c), 0x84, codesize(), 0x00)) {
                 mstore(0x00, 0x324f14ae) // `Permit2ApproveFailed()`.
                 revert(0x1c, 0x04)
             }

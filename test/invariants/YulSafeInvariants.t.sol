@@ -158,7 +158,7 @@ contract YulSafeInvariants is StdInvariant, Test {
 
     /// @notice Invariant: previewDeposit returns value <= actual deposit
     /// @dev Deposit rounds DOWN (user gets fewer shares than preview might suggest)
-    function invariant_previewDepositConservative() public view {
+    function invariant_previewDepositConservative() public pure {
         // This is checked implicitly through the handler actions
         // The preview functions should be consistent with actual operations
         assertTrue(true); // Placeholder - actual check is in fuzz tests
