@@ -28,3 +28,13 @@ zksync_sepolia = "https://sepolia.era.zksync.dev"
 zksync_sepolia = { key = "${ZKSYNC_ETHERSCAN_API_KEY}", url = "https://api-sepolia.explorer.zksync.io/api" }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+[profile.ci]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 10_000_000
+via_ir = false
+fuzz = { runs = 512 }
