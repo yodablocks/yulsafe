@@ -54,3 +54,22 @@ jobs:
 
       - name: Test on EraVM
         run: forge test -vvv
+
+  via-ir:
+    name: via-IR build and test (solc 0.8.36)
+    runs-on: ubuntu-latest
+    env:
+      FOUNDRY_PROFILE: viair
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1.9.1
+        with:
+          version: v1.8.3
+
+      - name: Build
+        run: forge build --sizes
+
+      - name: Test
+        run: forge test -vvv
