@@ -1,13 +1,13 @@
 # YulSafe
 
-**A gas-optimized ERC4626 vault in Solidity and Yul, built on Solady for zkSync Era.**
+**An EVM-optimized ERC4626 vault in Solidity and Yul, built on Solady, tested on the EVM and on zkSync Era.**
 
 YulSafe packs the vault's two hot values into one storage slot, does its share math in inline assembly, and emits events with raw LOG opcodes. On the EVM it reads state in a single SLOAD and cuts view-function gas by up to 67% against Solady's own ERC4626, while keeping donation resistance, first-depositor protection, reentrancy guards and vault-favoring rounding. On EraVM the picture is different, and the numbers below say so.
 
 [![CI](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml/badge.svg)](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml)
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.37-363636?logo=solidity&logoColor=white)
 ![Foundry](https://img.shields.io/badge/Foundry-forge-FFDB1C)
-![zkSync Era](https://img.shields.io/badge/zkSync-Era-1E69FF)
+![zkSync Era](https://img.shields.io/badge/zkSync%20Era-tested%20on%20EraVM-1E69FF)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 ![Status](https://img.shields.io/badge/status-unaudited-orange)
 
@@ -149,7 +149,7 @@ Measured from transaction receipts on a local `anvil-zksync` 0.6.11 node, compil
 | `convertToShares()` estimate | 150,407 | 163,102 | -8% |
 | `convertToAssets()` estimate | 150,407 | 163,102 | -8% |
 
-**Read this honestly.** The 67% view saving on the EVM does not carry over. EraVM charges every transaction a large fixed cost for the bootloader and for publishing state to L1, and a storage read is cheap relative to that. Saving one SLOAD moves the total by single-digit percentages, and the extra security checks on the write path cost about as much as they do on the EVM. YulSafe is a correct and well-tested vault on zkSync Era, and it runs there under the same test suite, but on today's EraVM its gas edge is small. The packed-slot technique is an EVM optimization first.
+**Read this honestly.** The 67% view saving on the EVM does not carry over. EraVM charges every transaction a large fixed cost for the bootloader and for publishing state to L1, and a storage read is cheap relative to that. Saving one SLOAD moves the total by single-digit percentages, and the extra security checks on the write path cost about as much as they do on the EVM. YulSafe runs correctly on zkSync Era under the same test suite, but on today's EraVM its gas edge is small. The packed-slot technique is an EVM optimization first, which is why the project now describes itself that way.
 
 ## Tests
 
