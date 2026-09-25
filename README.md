@@ -2,11 +2,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-blue)](https://soliditylang.org/)
-[![Tests](https://img.shields.io/badge/Tests-127%2F127_passing-brightgreen)](https://github.com/yourusername/yulsafe)
+[![CI](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml/badge.svg)](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml)
 
 > **⚡ Up to 59% gas savings on view functions** through packed storage and Yul optimization
 
-YulSafe is a production-grade, gas-optimized ERC4626-compliant vault built with Solady and Yul for maximum efficiency on zkSync Era. It serves as both a technical showcase of low-level EVM optimization techniques and a ready-to-use savings vault primitive.
+YulSafe is an unaudited, gas-optimized ERC4626-compliant vault built with Solady and Yul for maximum efficiency on zkSync Era. It serves as both a technical showcase of low-level EVM optimization techniques and a ready-to-use savings vault primitive.
 
 ## 🎯 Key Features
 
@@ -16,11 +16,13 @@ YulSafe is a production-grade, gas-optimized ERC4626-compliant vault built with 
 - **ERC4626 Compliant**: Full compatibility with DeFi composability standards
 - **zkSync Native**: Optimized for zkSync Era's unique gas model
 - **Heavily Documented**: Every Yul block explained for reviewability
-- **Production Ready**: 100% test pass rate (127/127 tests), comprehensive property-based testing
+- **Thoroughly Tested**: 100% test pass rate (127/127 tests), comprehensive property-based testing. Unaudited, see the disclaimer below
 
 ## 📊 Gas Benchmarks
 
 **All tests passing: 127/127 ✅** (62 unit + 16 benchmark + 16 invariant + 19 rounding fuzz + 14 inflation attack fuzz)
+
+> **Measurement note**: the numbers below come from `forge test --gas-report` on the standard EVM. They have not yet been re-measured on EraVM with zksolc, where storage and call pricing differ.
 
 ### View Functions (YulSafe Wins)
 
@@ -97,7 +99,7 @@ See [fix-issue1.md](./fix-issue1.md) for detailed changelog.
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/yulsafe
+git clone https://github.com/yodablocks/yulsafe
 cd yulsafe
 
 # Install dependencies
