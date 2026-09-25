@@ -8,11 +8,13 @@ This contract has NOT been reviewed by security professionals and should NOT be 
 
 ## 🔒 Security Features Implemented
 
-### 1. First Depositor Inflation Attack Protection
+### 1. Donation and Inflation Attack Resistance
 
-**Attack Vector**: An attacker could deposit a minimal amount (1 wei), then directly transfer a large amount of tokens to the vault to inflate the share price, causing subsequent depositors to receive 0 shares due to rounding.
+**Attack Vector**: In a vault that prices shares from `asset.balanceOf(vault)`, an attacker deposits a minimal amount (1 wei), then transfers a large amount of tokens directly to the vault. The share price jumps, and the next depositor's shares round down to 0 while the attacker redeems their deposit plus the victim's.
 
-**Mitigation**: On first deposit, `MINIMUM_LIQUIDITY` (1000) shares are permanently minted to `address(0)`, making this attack economically infeasible.
+**Mitigation, first layer**: YulSafe never reads its own token balance. The share price is derived from the packed `totalAssets` field, which only changes inside `deposit`, `mint`, `withdraw` and `redeem`, by exactly the amount transferred in or out. A direct transfer to the contract leaves both `totalAssets` and `totalSupply` untouched, so the price does not move and the victim loses nothing. The invariant `invariant_donationsDoNotMovePrice` checks this after every donation in the handler, and `testFuzz_attackCostExceedsPotentialGain` checks the victim's loss is exactly zero.
+
+**Mitigation, second layer**: On the first deposit, `MINIMUM_LIQUIDITY` (1000) shares are permanently minted to `address(0)`. This closes the remaining rounding edge case on a tiny first deposit and makes any attempt cost the attacker those shares for good.
 
 ```solidity
 // First deposit
@@ -21,7 +23,9 @@ _mint(address(0), MINIMUM_LIQUIDITY);  // Locked forever
 _mint(receiver, shares);
 ```
 
-**Status**: ✅ Implemented and tested
+**Trade-off**: Tokens sent directly to the vault are stranded. There is deliberately no sweep function, because an owner-callable sweep would turn "no stranded value" into a trust assumption.
+
+**Status**: ✅ Implemented and invariant-tested
 
 ### 2. Reentrancy Protection
 
@@ -94,7 +98,7 @@ Owner can pause deposits/withdrawals in emergency situations.
 
 **Risk**: Potential manipulation of share price within a single transaction.
 
-**Mitigation**: First depositor protection + rounding protection make most attacks unprofitable.
+**Mitigation**: Share price cannot be moved by donations at all, and every rounding decision favors the vault, so the usual flash-loan path (borrow, donate, deposit, withdraw) has nothing to exploit. There is no explicit same-block guard.
 
 **Status**: ⚠️ Not explicitly protected beyond existing mechanisms
 

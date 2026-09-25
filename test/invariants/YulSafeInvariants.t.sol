@@ -130,25 +130,28 @@ contract YulSafeInvariants is StdInvariant, Test {
                       SHARE PRICE INVARIANTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Invariant: Share price is monotonically non-decreasing (absent donations)
-    /// @dev Due to rounding in vault's favor, share price should never decrease
-    ///      Note: Direct donations CAN increase share price, which is expected
+    /// @notice Invariant: share price never decreases across any handler action
+    /// @dev Every rounding decision favors the vault, so totalAssets / totalSupply
+    ///      is monotonically non-decreasing. The handler compares the ratio before
+    ///      and after each call as a cross product and counts violations.
     function invariant_sharePriceNonDecreasing() public view {
-        uint256 totalSupply = vault.totalSupply();
+        assertEq(
+            handler.ghost_priceDecreases(),
+            0,
+            "INVARIANT VIOLATED: Share price decreased after a vault action"
+        );
+    }
 
-        if (totalSupply == 0) return;
-
-        // Share price = totalAssets / totalSupply
-        // For 1 share, we should get at least 1 asset (or close to it with rounding)
-        uint256 assetsPerShare = vault.convertToAssets(1e18);
-
-        // Share price should be at least ~1:1 (accounting for minimum liquidity)
-        // After first deposit, totalAssets == totalSupply, so price ~= 1
-        // Rounding errors and donations can only increase this
-        assertGe(
-            assetsPerShare,
-            0, // Weakest check - just ensuring it's non-negative
-            "INVARIANT VIOLATED: Negative share price"
+    /// @notice Invariant: direct donations do not move the share price
+    /// @dev The vault never reads its own token balance. totalAssets only changes
+    ///      inside deposit, mint, withdraw and redeem, so tokens sent straight to
+    ///      the contract cannot inflate or deflate the price. This is what makes
+    ///      the classic ERC4626 donation attack inert here.
+    function invariant_donationsDoNotMovePrice() public view {
+        assertEq(
+            handler.ghost_donationPriceChanges(),
+            0,
+            "INVARIANT VIOLATED: A donation changed totalAssets or totalSupply"
         );
     }
 
@@ -267,5 +270,13 @@ contract YulSafeInvariantsWithInitialDeposit is StdInvariant, Test {
 
     function invariant_noValueExtraction() public view {
         assertLe(handler.ghost_withdrawSum(), handler.ghost_depositSum());
+    }
+
+    function invariant_sharePriceNonDecreasing() public view {
+        assertEq(handler.ghost_priceDecreases(), 0, "Share price decreased");
+    }
+
+    function invariant_donationsDoNotMovePrice() public view {
+        assertEq(handler.ghost_donationPriceChanges(), 0, "Donation moved the price");
     }
 }
