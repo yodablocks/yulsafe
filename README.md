@@ -2,7 +2,7 @@
 
 **A gas-optimized ERC4626 vault in Solidity and Yul, built on Solady for zkSync Era.**
 
-YulSafe packs the vault's two hot values into one storage slot, does its share math in inline assembly, and emits events with raw LOG opcodes. The result reads state in a single SLOAD and cuts view-function gas by up to 67% against Solady's own ERC4626, while keeping first-depositor protection, reentrancy guards and vault-favoring rounding.
+YulSafe packs the vault's two hot values into one storage slot, does its share math in inline assembly, and emits events with raw LOG opcodes. On the EVM it reads state in a single SLOAD and cuts view-function gas by up to 67% against Solady's own ERC4626, while keeping donation resistance, first-depositor protection, reentrancy guards and vault-favoring rounding. On EraVM the picture is different, and the numbers below say so.
 
 [![CI](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml/badge.svg)](https://github.com/yodablocks/yulsafe/actions/workflows/test.yml)
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.37-363636?logo=solidity&logoColor=white)
@@ -47,6 +47,13 @@ git clone https://github.com/yodablocks/yulsafe && cd yulsafe
 forge build
 forge test
 forge test --gas-report        # YulSafe next to Solady's ERC4626 on the same calls
+```
+
+For zkSync Era, install [foundry-zksync](https://github.com/matter-labs/foundry-zksync) and use the `zksync` profile, which compiles through zksolc and runs the tests on the EraVM emulator:
+
+```sh
+FOUNDRY_PROFILE=zksync forge build
+FOUNDRY_PROFILE=zksync forge test
 ```
 
 ## Example
@@ -108,7 +115,9 @@ flowchart LR
 
 ## Gas
 
-Measured with `forge test --gas-report` on the standard EVM, solc 0.8.37 targeting cancun, optimizer on at 10,000,000 runs, against Solady's `ERC4626` under the same calls. These have not yet been re-measured on EraVM with zksolc, where storage and call pricing differ.
+### EVM
+
+Measured with `forge test --gas-report` on the standard EVM, solc 0.8.37 targeting cancun, optimizer on at 10,000,000 runs, against Solady's `ERC4626` under the same calls.
 
 | Function | YulSafe | Solady ERC4626 | Change |
 |---|---|---|---|
@@ -125,16 +134,33 @@ Deployment: 1,712,163 gas, 8,391 bytes.
 
 The view functions are where the packed slot pays off. State-changing calls cost more than Solady's base vault because they carry a reentrancy guard, a pause check, the minimum-liquidity burn and configurable name and symbol storage, none of which the Solady baseline has.
 
+### zkSync Era (EraVM)
+
+Measured from transaction receipts on a local `anvil-zksync` 0.6.11 node, compiled with zksolc 1.5.15 and the zkSync-patched solc 0.8.30, same call sequence for both vaults. Reproduce with `script/bench-eravm.sh`. Views cannot be sent as transactions, so they are reported through `eth_estimateGas`, which on zkSync includes a large fixed per-transaction overhead.
+
+| Function | YulSafe | Solady ERC4626 | Change |
+|---|---|---|---|
+| `deposit()` first | 201,031 | 173,466 | +16% |
+| `deposit()` subsequent | 178,774 | 166,106 | +8% |
+| `mint()` | 178,768 | 166,148 | +8% |
+| `withdraw()` | 176,294 | 167,356 | +5% |
+| `redeem()` | 176,288 | 164,200 | +7% |
+| `totalAssets()` estimate | 150,407 | 159,929 | -6% |
+| `convertToShares()` estimate | 150,407 | 163,102 | -8% |
+| `convertToAssets()` estimate | 150,407 | 163,102 | -8% |
+
+**Read this honestly.** The 67% view saving on the EVM does not carry over. EraVM charges every transaction a large fixed cost for the bootloader and for publishing state to L1, and a storage read is cheap relative to that. Saving one SLOAD moves the total by single-digit percentages, and the extra security checks on the write path cost about as much as they do on the EVM. YulSafe is a correct and well-tested vault on zkSync Era, and it runs there under the same test suite, but on today's EraVM its gas edge is small. The packed-slot technique is an EVM optimization first.
+
 ## Tests
 
-140 tests across six suites, run in CI on every push and pull request.
+140 tests across six suites, run in CI on every push and pull request. The same suite, minus the invariant harness, also runs in CI on the EraVM emulator through zksolc.
 
 | Suite | Tests | Covers |
 |---|---|---|
 | `YulSafe.t.sol` | 62 | ERC4626 conformance, edge cases, access control |
 | `GasBenchmark.t.sol` | 16 | Side-by-side gas against Solady's ERC4626 |
 | `YulSafeHardening.t.sol` | 10 | Input bounds, preview and actual agreement, max functions never revert, consistent views inside token hooks |
-| `invariants/` | 19 | Solvency, share price never decreases, donations never move the price, locked minimum liquidity, no value extraction |
+| `invariants/` | 19 | Solvency, share price never decreases, donations never move the price, locked minimum liquidity, no value extraction. EVM only: the handler drives cheatcodes from a non-test contract, which the EraVM emulator does not support |
 | `fuzz/RoundingProperties.t.sol` | 19 | Every path rounds in the vault's favor |
 | `fuzz/InflationAttack.t.sol` | 14 | Victims never receive zero shares, attackers lose the locked liquidity |
 
