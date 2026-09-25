@@ -164,7 +164,7 @@ contract Handler is Test {
         amount = bound(amount, 1, balance);
 
         vm.prank(from);
-        vault.transfer(to, amount);
+        assertTrue(vault.transfer(to, amount));
     }
 
     /// @notice Simulate direct token transfer to vault (donation attack vector)
@@ -175,7 +175,7 @@ contract Handler is Test {
         if (asset.balanceOf(currentActor) < amount) return;
 
         // Direct transfer to vault (not through deposit)
-        asset.transfer(address(vault), amount);
+        assertTrue(asset.transfer(address(vault), amount));
     }
 
     /*//////////////////////////////////////////////////////////////
