@@ -126,23 +126,25 @@ If you discover a security vulnerability in YulSafe:
 
 We will respond within 48 hours and coordinate disclosure.
 
-## 🎯 Audit Checklist
+## 🎯 Audit Status
 
-Before production use, a professional audit should verify:
+Nothing in this repository has been audited. The table records what evidence exists in the repo for each concern, so a reviewer can see which claims are backed by tests and which are still intentions. "Evidence" means automated checks that run in CI; it is not a substitute for an independent review.
 
-- [ ] Arithmetic overflow/underflow scenarios
-- [ ] Reentrancy attack vectors
-- [ ] Price manipulation attacks
-- [ ] First depositor attack protection effectiveness
-- [ ] Rounding error accumulation
-- [ ] Access control mechanisms
-- [ ] Pausability edge cases
-- [ ] ERC4626 standard compliance
-- [ ] Gas optimization safety trade-offs
-- [ ] Packed storage correctness
-- [ ] Assembly code correctness
-- [ ] Event emission accuracy
-- [ ] Error selector correctness
+| Concern | Evidence in the repository | Still needs |
+|---|---|---|
+| Arithmetic overflow and underflow | Explicit input bounds on every path, `YulSafeHardening.t.sol` covers wrapping inputs and the first-deposit edge | Line-by-line review of the Yul arithmetic |
+| Reentrancy | Solady `ReentrancyGuard` on all state changes, shares minted before the token transfer, hooked-token test proves views stay consistent mid-call | Review against ERC777-style and callback tokens |
+| Price manipulation | `invariant_donationsDoNotMovePrice` and `invariant_sharePriceNonDecreasing`, 25,600 handler calls per run | Independent review |
+| First-depositor attack | `fuzz/InflationAttack.t.sol`, 14 tests, victim loss asserted to be exactly zero | None beyond audit |
+| Rounding | `fuzz/RoundingProperties.t.sol`, 19 tests, plus the price-never-decreases invariant | None beyond audit |
+| ERC4626 compliance | Preview functions equal the real call, `withdraw(maxWithdraw)` and `redeem(maxRedeem)` never revert, fuzzed | A third-party property suite such as [a16z/erc4626-tests](https://github.com/a16z/erc4626-tests) |
+| Error selectors | Every hard-coded selector checked against the declared error in tests. A wrong `ExceedsMaxCapacity` selector was found and fixed this way | None |
+| Access control | Unit tests for owner-only pause and unpause | Adversarial review, multisig deployment guidance |
+| Pausability edge cases | Unit tests, `invariant_pauseRespectsMaxFunctions` | Review of funds locked under an indefinite pause |
+| Packed storage correctness | `invariant_storageCapacity`, `invariant_shareAccountingConsistency`, solvency invariant | This is the core of any audit |
+| Assembly correctness | Byte-identical output from two independent compilers (solc and oksolc) on the via-IR path, full suite on three CI pipelines | Manual review of every Yul block |
+| Event emission accuracy | Events asserted in unit tests | Review of the raw `log3`/`log4` layouts against the ERC4626 signatures |
+| Gas trade-offs | Gas measured on the EVM and on EraVM, both published in the README | None |
 
 ## 📚 Security Resources
 
