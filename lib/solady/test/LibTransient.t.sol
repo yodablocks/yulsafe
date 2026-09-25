@@ -153,42 +153,46 @@ contract LibTransientTest is SoladyTest {
 
     function testUint256IncDecTransient() public {
         for (uint256 c; c < 3; ++c) {
-            vm.chainId(c);
-            uint256 tSlot;
-            LibTransient.TUint256 storage p = LibTransient.tUint256(tSlot);
-            p.setCompat(10);
-            assertEq(this.tUintIncCompat(tSlot), 11);
-            assertEq(p.getCompat(), 11);
-            assertEq(this.tUintIncCompat(tSlot, 20), 31);
-            assertEq(p.getCompat(), 31);
-            p.setCompat(2 ** 256 - 2);
-            assertEq(this.tUintIncCompat(tSlot), 2 ** 256 - 1);
-            assertEq(p.getCompat(), 2 ** 256 - 1);
-            vm.expectRevert();
-            this.tUintIncCompat(tSlot);
-            vm.expectRevert();
-            this.tUintIncCompat(tSlot, 10);
-            assertEq(this.tUintDecCompat(tSlot), 2 ** 256 - 2);
-            assertEq(p.getCompat(), 2 ** 256 - 2);
-            p.setCompat(10);
-            assertEq(this.tUintDecCompat(tSlot, 5), 5);
-            assertEq(p.getCompat(), 5);
-            assertEq(this.tUintDecCompat(tSlot, 5), 0);
-            assertEq(p.getCompat(), 0);
-            vm.expectRevert();
-            this.tUintDecCompat(tSlot);
-            vm.expectRevert();
-            this.tUintDecCompat(tSlot, 5);
-            p.setCompat(10);
-            assertEq(this.tUintIncSignedCompat(tSlot, 1), 11);
-            assertEq(p.getCompat(), 11);
-            assertEq(this.tUintIncSignedCompat(tSlot, -1), 10);
-            assertEq(p.getCompat(), 10);
-            assertEq(this.tUintDecSignedCompat(tSlot, 1), 9);
-            assertEq(p.getCompat(), 9);
-            assertEq(this.tUintDecSignedCompat(tSlot, -1), 10);
-            assertEq(p.getCompat(), 10);
+            this.checkUint256IncDecTransient(c);
         }
+    }
+
+    function checkUint256IncDecTransient(uint256 c) public {
+        vm.chainId(c);
+        uint256 tSlot;
+        LibTransient.TUint256 storage p = LibTransient.tUint256(tSlot);
+        p.setCompat(10);
+        assertEq(this.tUintIncCompat(tSlot), 11);
+        assertEq(p.getCompat(), 11);
+        assertEq(this.tUintIncCompat(tSlot, 20), 31);
+        assertEq(p.getCompat(), 31);
+        p.setCompat(2 ** 256 - 2);
+        assertEq(this.tUintIncCompat(tSlot), 2 ** 256 - 1);
+        assertEq(p.getCompat(), 2 ** 256 - 1);
+        vm.expectRevert();
+        this.tUintIncCompat(tSlot);
+        vm.expectRevert();
+        this.tUintIncCompat(tSlot, 10);
+        assertEq(this.tUintDecCompat(tSlot), 2 ** 256 - 2);
+        assertEq(p.getCompat(), 2 ** 256 - 2);
+        p.setCompat(10);
+        assertEq(this.tUintDecCompat(tSlot, 5), 5);
+        assertEq(p.getCompat(), 5);
+        assertEq(this.tUintDecCompat(tSlot, 5), 0);
+        assertEq(p.getCompat(), 0);
+        vm.expectRevert();
+        this.tUintDecCompat(tSlot);
+        vm.expectRevert();
+        this.tUintDecCompat(tSlot, 5);
+        p.setCompat(10);
+        assertEq(this.tUintIncSignedCompat(tSlot, 1), 11);
+        assertEq(p.getCompat(), 11);
+        assertEq(this.tUintIncSignedCompat(tSlot, -1), 10);
+        assertEq(p.getCompat(), 10);
+        assertEq(this.tUintDecSignedCompat(tSlot, 1), 9);
+        assertEq(p.getCompat(), 9);
+        assertEq(this.tUintDecSignedCompat(tSlot, -1), 10);
+        assertEq(p.getCompat(), 10);
     }
 
     function tUintIncSignedCompat(uint256 tSlot, int256 delta) public returns (uint256) {
@@ -358,6 +362,54 @@ contract LibTransientTest is SoladyTest {
         this.stackPop(0);
     }
 
+    function testClearedStackTopReverts(uint256 stackSlot, uint256 clears) public {
+        vm.expectRevert(LibTransient.StackIsEmpty.selector);
+        this.stackPlaceClearThenTop(stackSlot, _bound(clears, 1, 3));
+    }
+
+    function testClearedStackPopReverts(uint256 stackSlot, uint256 clears) public {
+        vm.expectRevert(LibTransient.StackIsEmpty.selector);
+        this.stackPlaceClearThenPop(stackSlot, _bound(clears, 1, 3));
+    }
+
+    function stackPlaceClearThenTop(uint256 stackSlot, uint256 clears) public returns (bytes32) {
+        LibTransient.TStack storage stack = LibTransient.tStack(stackSlot);
+        stack.place();
+        for (uint256 i; i < clears; ++i) {
+            stack.clear();
+        }
+        assertEq(stack.length(), 0);
+        assertEq(stack.peek(), 0);
+        return stack.top();
+    }
+
+    function stackPlaceClearThenPop(uint256 stackSlot, uint256 clears) public returns (bytes32) {
+        LibTransient.TStack storage stack = LibTransient.tStack(stackSlot);
+        stack.place();
+        for (uint256 i; i < clears; ++i) {
+            stack.clear();
+        }
+        assertEq(stack.length(), 0);
+        assertEq(stack.peek(), 0);
+        return stack.pop();
+    }
+
+    function testStackClearIsolatesItems(uint256 stackSlot) public {
+        bytes32 oldPtr = LibTransient.tStack(stackSlot).place();
+        LibTransient.tBytes32(oldPtr).set(bytes32(uint256(0xa11ce)));
+
+        LibTransient.tStack(stackSlot).clear();
+
+        bytes32 freshPtr = LibTransient.tStack(stackSlot).place();
+        assertTrue(freshPtr != oldPtr);
+        assertEq(LibTransient.tBytes32(freshPtr).get(), 0);
+        assertEq(LibTransient.tStack(stackSlot).length(), 1);
+        assertEq(LibTransient.tStack(stackSlot).top(), freshPtr);
+        assertEq(LibTransient.tStack(stackSlot).peek(), freshPtr);
+        // `clear` only abandons the old region, it does not wipe it.
+        assertEq(LibTransient.tBytes32(oldPtr).get(), bytes32(uint256(0xa11ce)));
+    }
+
     function stackTop(uint256 stackSlot) public view returns (bytes32) {
         return LibTransient.tStack(stackSlot).top();
     }
@@ -367,6 +419,10 @@ contract LibTransientTest is SoladyTest {
     }
 
     function testRegistry(bytes32 key, bytes memory value) public {
+        this.checkRegistry(key, value);
+    }
+
+    function checkRegistry(bytes32 key, bytes memory value) public {
         _etchTransientRegistry();
         if (_randomChance(2)) {
             vm.expectRevert(bytes4(keccak256("TransientRegistryUnauthorized()")));
@@ -451,6 +507,10 @@ contract LibTransientTest is SoladyTest {
     }
 
     function testRegistryAB() public {
+        this.checkRegistryAB();
+    }
+
+    function checkRegistryAB() public {
         _etchTransientRegistry();
         bytes32 aInitCodeHash = keccak256(type(A).creationCode);
         bytes32 bInitCodeHash = keccak256(type(B).creationCode);
