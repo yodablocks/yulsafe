@@ -60,3 +60,12 @@ Fourteen pull requests, one tagged release, and a README I can link to without c
 The lesson I keep coming back to: I went looking for bugs in someone else's compiler and found them in my own vault, because I had never pointed the same scrutiny at my own code. The tools that made the difference were not exotic. Real invariants instead of placeholder ones. A mutation check to prove the invariants can fail. Measuring on the actual target instead of the convenient one. And reading the code as if I wanted to steal from it.
 
 oksolc is at [github.com/okcontract/oksolc](https://github.com/okcontract/oksolc). YulSafe is at [github.com/yodablocks/yulsafe](https://github.com/yodablocks/yulsafe), unaudited, and now honest about it.
+
+## Postscript: did the assembly matter?
+
+After publishing this I asked the question the write-up left open. I rewrote the vault in plain Solidity with the same storage layout, two `uint96` fields next to each other, and not one line of assembly. It passes the same 26 ERC4626 properties.
+
+The views cost the same to within five gas. The compiler emits one SLOAD for two adjacent 96-bit fields on its own. The plain version is about 1,400 gas cheaper on every write, on the EVM and on EraVM alike. The only thing the hand-written Yul buys is a smaller deployment, and under via-IR that gap is 2%.
+
+So the entire gas advantage over Solady's vault comes from a two-line layout decision. The twelve assembly blocks were technique, not savings. The numbers are in the README under "Did the assembly matter?", and I would rather have found that out myself than have a reader find it for me.
+

@@ -20,7 +20,7 @@ contract YulSafeERC4626Std is ERC4626Test {
     uint256 constant MINIMUM_LIQUIDITY = 1000;
     uint256 constant CAP = 1e27; // four users plus yield stay far below 2^96
 
-    function setUp() public override {
+    function setUp() public virtual override {
         _underlying_ = address(new MockERC20("Mock Token", "MOCK", 18));
         _vault_ = address(new YulSafeERC20(_underlying_, "YulSafe Vault", "ysVAULT"));
         _delta_ = 0;
