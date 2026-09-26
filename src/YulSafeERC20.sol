@@ -36,11 +36,8 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
     /// @dev First depositor will have this amount of shares burned to address(0)
     uint256 private constant MINIMUM_LIQUIDITY = 1000;
 
-    /// @notice Maximum value for 96-bit packed storage (2^96 - 1)
+    /// @notice 2^96 - 1: the capacity of each packed lane, and the mask that extracts one
     uint256 private constant MAX_96_BITS = 0xFFFFFFFFFFFFFFFFFFFFFFFF;
-
-    /// @notice Bitmask for extracting 96-bit values
-    uint256 private constant MASK_96 = 0xFFFFFFFFFFFFFFFFFFFFFFFF;
 
     /*//////////////////////////////////////////////////////////////
                               STORAGE LAYOUT
@@ -217,11 +214,11 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             let packed := sload(_packedVaultState.slot)
 
             // Extract totalAssets (bits 0-95)
-            let _totalAssets := and(packed, MASK_96)
+            let _totalAssets := and(packed, MAX_96_BITS)
 
             // Extract totalSupply (bits 96-191)
             // Right shift by 96 bits, then mask to get 96 bits
-            let _totalSupply := and(shr(96, packed), MASK_96)
+            let _totalSupply := and(shr(96, packed), MAX_96_BITS)
 
             // 5. Calculate shares (OPTIMIZATION I: Inline assembly math)
             switch _totalSupply
@@ -359,8 +356,8 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
 
             // 3. Load packed storage
             let packed := sload(_packedVaultState.slot)
-            let _totalAssets := and(packed, MASK_96)
-            let _totalSupply := and(shr(96, packed), MASK_96)
+            let _totalAssets := and(packed, MAX_96_BITS)
+            let _totalSupply := and(shr(96, packed), MAX_96_BITS)
 
             // 4. Calculate assets needed
             // assets = (shares * _totalAssets) / _totalSupply
@@ -461,8 +458,8 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
 
             // 3. Load packed storage
             let packed := sload(_packedVaultState.slot)
-            let _totalAssets := and(packed, MASK_96)
-            let _totalSupply := and(shr(96, packed), MASK_96)
+            let _totalAssets := and(packed, MAX_96_BITS)
+            let _totalSupply := and(shr(96, packed), MAX_96_BITS)
 
             // 4. Check sufficient assets
             if gt(assets, _totalAssets) {
@@ -545,8 +542,8 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
 
             // 3. Load packed storage
             let packed := sload(_packedVaultState.slot)
-            let _totalAssets := and(packed, MASK_96)
-            let _totalSupply := and(shr(96, packed), MASK_96)
+            let _totalAssets := and(packed, MAX_96_BITS)
+            let _totalSupply := and(shr(96, packed), MAX_96_BITS)
 
             // 4. Check sufficient shares, which also bounds the multiplication
             if gt(shares, _totalSupply) {
@@ -607,7 +604,7 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
         uint256 packed = _packedVaultState;
         assembly {
             // Return bits 0-95 (totalAssets)
-            result := and(packed, MASK_96)
+            result := and(packed, MAX_96_BITS)
         }
     }
 
@@ -618,8 +615,8 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
     function _vaultState() private view returns (uint256 assets_, uint256 supply_) {
         uint256 packed = _packedVaultState;
         assembly {
-            assets_ := and(packed, MASK_96)
-            supply_ := and(shr(96, packed), MASK_96)
+            assets_ := and(packed, MAX_96_BITS)
+            supply_ := and(shr(96, packed), MAX_96_BITS)
         }
     }
 
