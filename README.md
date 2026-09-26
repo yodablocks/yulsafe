@@ -117,22 +117,22 @@ flowchart LR
 
 ### EVM
 
-Measured with `forge test --gas-report` on the standard EVM, solc 0.8.37 targeting cancun, optimizer on at 10,000,000 runs, against Solady's `ERC4626` under the same calls.
+Per-transaction gas of each call, solc 0.8.37 targeting cancun, optimizer on at 10,000,000 runs, against Solady's `ERC4626` under the same calls. Measured with `script/bench-evm.py`, which runs each benchmark in isolation so every call pays real cold-access costs, and excludes the 21,000 intrinsic cost that is the same for every vault.
 
 | Function | YulSafe | Solady ERC4626 | Change |
 |---|---|---|---|
 | `totalAssets()` | 2,321 | 5,621 | -59% |
 | `convertToShares()` | 2,674 | 8,072 | -67% |
 | `convertToAssets()` | 2,675 | 8,108 | -67% |
-| `deposit()` first | 63,028 | 54,709 | +15% |
-| `deposit()` subsequent | 175,513 | 106,009 | +66% |
+| `deposit()` first, cold vault | 175,513 | 106,009 | +66% |
+| `deposit()` subsequent | 63,028 | 54,709 | +15% |
 | `mint()` | 63,078 | 54,735 | +15% |
 | `withdraw()` | 61,279 | 54,576 | +12% |
 | `redeem()` | 61,303 | 53,284 | +15% |
 
 Deployment: 1,712,163 gas, 8,391 bytes.
 
-The view functions are where the packed slot pays off. State-changing calls cost more than Solady's base vault because they carry a reentrancy guard, a pause check, the minimum-liquidity burn and configurable name and symbol storage, none of which the Solady baseline has.
+The view functions are where the packed slot pays off. State-changing calls cost 12 to 15% more than Solady's base vault because they carry a reentrancy guard, a pause check and the minimum-liquidity burn, none of which the Solady baseline has. The first deposit into an empty vault is a one-time cost that initializes those extra slots.
 
 ### zkSync Era (EraVM)
 
@@ -153,15 +153,15 @@ Measured from transaction receipts on a local `anvil-zksync` 0.6.11 node, compil
 
 ## Did the assembly matter?
 
-`test/mocks/PlainPackedVault.sol` is YulSafe rewritten in plain Solidity with zero assembly: two `uint96` fields the compiler packs into one slot on its own, the same checks, rounding, first-deposit burn, events and errors. It passes the same 26 a16z ERC4626 properties. Same benchmark, same calls, solc 0.8.37, optimizer at 10,000,000 runs:
+`test/mocks/PlainPackedVault.sol` is YulSafe rewritten in plain Solidity with zero assembly: two `uint96` fields the compiler packs into one slot on its own, the same checks, rounding, first-deposit burn, events and errors. It passes the same 26 a16z ERC4626 properties. Same benchmark, same calls, same per-transaction measurement:
 
 | Function | YulSafe (Yul) | Plain Solidity | Solady ERC4626 |
 |---|---|---|---|
 | `totalAssets()` | 2,321 | 2,321 | 5,621 |
 | `convertToShares()` | 2,674 | 2,679 | 8,072 |
 | `convertToAssets()` | 2,675 | 2,680 | 8,108 |
-| `deposit()` first | 63,028 | 61,551 | 54,709 |
-| `deposit()` subsequent | 175,513 | 173,805 | 106,009 |
+| `deposit()` first, cold vault | 175,513 | 173,805 | 106,009 |
+| `deposit()` subsequent | 63,028 | 61,551 | 54,709 |
 | `mint()` | 63,078 | 61,740 | 54,735 |
 | `withdraw()` | 61,279 | 59,938 | 54,576 |
 | `redeem()` | 61,303 | 59,818 | 53,284 |
@@ -169,7 +169,9 @@ Measured from transaction receipts on a local `anvil-zksync` 0.6.11 node, compil
 
 On EraVM, from transaction receipts with the same script as above, the twin is about 1% cheaper than YulSafe on every write and identical on every view.
 
-**The honest reading.** The views are equal to within five gas: the compiler emits one SLOAD for two adjacent `uint96` fields without any help. The plain version is 1,300 to 1,500 gas cheaper on every write. The only thing the hand-written Yul buys is a smaller deployment, and under via-IR even that gap shrinks to 2%. Everything YulSafe saves against Solady comes from putting both totals in one slot, which is a layout decision any Solidity programmer can make in two lines. The assembly is a showcase of technique, not a source of savings. The vault keeps it because that is what the project is for, and this section exists so nobody copies the assembly expecting a gas win.
+**The honest reading.** The views are equal to within five gas: the compiler emits one SLOAD for two adjacent `uint96` fields without any help. On writes the two effects pull in opposite directions. The hand-written Yul saves about 600 gas of execution per write, visible when the same call is measured with warm storage. The plain twin declares its pause flag next to the two totals, so the compiler packs all three into one slot and every write does one cold SLOAD fewer, worth about 2,000 gas. Net per transaction, the plain version is 1,300 to 1,500 gas cheaper. The only thing the Yul wins outright is deployment size, and under via-IR that gap is 2%.
+
+So everything YulSafe saves against Solady, and a little more, comes from layout: two totals in one slot, and the pause flag beside them. Both are declarations any Solidity programmer can write. The assembly is worth a few hundred gas of technique and cost this project its one real bug. The vault keeps it because that is what the project is for, and this section exists so nobody copies the assembly expecting a gas win.
 
 ## Tests
 

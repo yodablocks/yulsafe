@@ -65,7 +65,8 @@ oksolc is at [github.com/okcontract/oksolc](https://github.com/okcontract/oksolc
 
 After publishing this I asked the question the write-up left open. I rewrote the vault in plain Solidity with the same storage layout, two `uint96` fields next to each other, and not one line of assembly. It passes the same 26 ERC4626 properties.
 
-The views cost the same to within five gas. The compiler emits one SLOAD for two adjacent 96-bit fields on its own. The plain version is about 1,400 gas cheaper on every write, on the EVM and on EraVM alike. The only thing the hand-written Yul buys is a smaller deployment, and under via-IR that gap is 2%.
+The views cost the same to within five gas. The compiler emits one SLOAD for two adjacent 96-bit fields on its own. On writes the assembly does save about 600 gas of execution, but the plain version declares its pause flag next to the totals, the compiler packs all three into one slot, and that saves one cold storage read per write, about 2,000 gas. Per transaction the plain version is about 1,400 gas cheaper. The Yul wins only on deployment size, and under via-IR that gap is 2%.
 
-So the entire gas advantage over Solady's vault comes from a two-line layout decision. The twelve assembly blocks were technique, not savings. The numbers are in the README under "Did the assembly matter?", and I would rather have found that out myself than have a reader find it for me.
+So the entire gas advantage over Solady's vault comes from layout decisions, three declarations in a row. The twelve assembly blocks were worth a few hundred gas of technique, and they were where the one real bug lived. The numbers are in the README under "Did the assembly matter?", and I would rather have found that out myself than have a reader find it for me.
 
+While doing this I also found that the README's gas table had its first and subsequent deposit rows swapped since January. The values were right; the labels were not. Measuring each call in isolation, the way a transaction actually runs, is now a script in the repo.
