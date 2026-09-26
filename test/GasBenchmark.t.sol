@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {YulSafeERC20} from "../src/YulSafeERC20.sol";
 import {SoladyVault} from "./mocks/SoladyVault.sol";
 import {PlainPackedVault} from "./mocks/PlainPackedVault.sol";
+import {LeanVault} from "./mocks/LeanVault.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
 /// @title GasBenchmark
@@ -14,6 +15,7 @@ contract GasBenchmark is Test {
     YulSafeERC20 public yulSafe;
     SoladyVault public solady;
     PlainPackedVault public plain;
+    LeanVault public lean;
     MockERC20 public asset;
 
     address public alice = address(0x1);
@@ -27,6 +29,7 @@ contract GasBenchmark is Test {
         yulSafe = new YulSafeERC20(address(asset), "YulSafe Vault", "ysVAULT");
         solady = new SoladyVault(address(asset), "Solady Vault", "sVAULT");
         plain = new PlainPackedVault(address(asset), "Plain Vault", "pVAULT");
+        lean = new LeanVault(address(asset), "Lean Vault", "lVAULT");
 
         // Fund alice
         asset.mint(alice, INITIAL_BALANCE);
@@ -36,6 +39,7 @@ contract GasBenchmark is Test {
         asset.approve(address(yulSafe), type(uint256).max);
         asset.approve(address(solady), type(uint256).max);
         asset.approve(address(plain), type(uint256).max);
+        asset.approve(address(lean), type(uint256).max);
         vm.stopPrank();
     }
 
@@ -274,5 +278,76 @@ contract GasBenchmark is Test {
         plain.deposit(10000e18, alice);
 
         plain.convertToAssets(1000e18);
+    }
+
+    /// @notice Benchmark lean shell first deposit
+    function test_gas_lean_first_deposit() public {
+        vm.prank(alice);
+        lean.deposit(10000e18, alice);
+    }
+
+    /// @notice Benchmark lean shell subsequent deposit
+    function test_gas_lean_subsequent_deposit() public {
+        // First deposit to initialize
+        vm.prank(alice);
+        lean.deposit(10000e18, alice);
+
+        // Benchmark subsequent deposit
+        vm.prank(alice);
+        lean.deposit(5000e18, alice);
+    }
+
+    /// @notice Benchmark lean shell withdraw
+    function test_gas_lean_withdraw() public {
+        // Setup: deposit first
+        vm.prank(alice);
+        lean.deposit(10000e18, alice);
+
+        // Benchmark withdraw
+        vm.prank(alice);
+        lean.withdraw(5000e18, alice, alice);
+    }
+
+    /// @notice Benchmark lean shell redeem
+    function test_gas_lean_redeem() public {
+        // Setup: deposit first
+        vm.prank(alice);
+        uint256 shares = lean.deposit(10000e18, alice);
+
+        // Benchmark redeem (half the shares)
+        vm.prank(alice);
+        lean.redeem(shares / 2, alice, alice);
+    }
+
+    /// @notice Benchmark lean shell mint
+    function test_gas_lean_mint() public {
+        // First deposit to initialize
+        vm.prank(alice);
+        lean.deposit(10000e18, alice);
+
+        // Benchmark mint
+        vm.prank(alice);
+        lean.mint(5000e18, alice);
+    }
+
+    /// @notice Benchmark lean shell totalAssets
+    function test_gas_lean_totalAssets() public view {
+        lean.totalAssets();
+    }
+
+    /// @notice Benchmark lean shell convertToShares
+    function test_gas_lean_convertToShares() public {
+        vm.prank(alice);
+        lean.deposit(10000e18, alice);
+
+        lean.convertToShares(1000e18);
+    }
+
+    /// @notice Benchmark lean shell convertToAssets
+    function test_gas_lean_convertToAssets() public {
+        vm.prank(alice);
+        lean.deposit(10000e18, alice);
+
+        lean.convertToAssets(1000e18);
     }
 }

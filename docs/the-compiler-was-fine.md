@@ -70,3 +70,12 @@ The views cost the same to within five gas. The compiler emits one SLOAD for two
 So the entire gas advantage over Solady's vault comes from layout decisions, three declarations in a row. The twelve assembly blocks were worth a few hundred gas of technique, and they were where the one real bug lived. The numbers are in the README under "Did the assembly matter?", and I would rather have found that out myself than have a reader find it for me.
 
 While doing this I also found that the README's gas table had its first and subsequent deposit rows swapped since January. The values were right; the labels were not. Measuring each call in isolation, the way a transaction actually runs, is now a script in the repo.
+
+## Postscript 2: the lean shell
+
+Once the layout was shown to be the whole trick, the obvious question was how far layout alone could go. `LeanVault` puts the two totals and the pause flag in one slot, moves the reentrancy guard to transient storage, and uses a minimal share token that reads its supply from the packed word, so supply is written once. Plain Solidity, no assembly, same 26 properties.
+
+Per transaction it is the cheapest of the four vaults on every call a user repeats, on the EVM and on EraVM, while keeping the pause, the guard and the first-deposit burn that Solady's baseline does not have. The margin on writes against Solady is small, under 3%, because the security features now cost almost nothing. It loses on two things: the first deposit, by the one cold write that locks the initial shares, and deployment, because it ships more code than a contract that does less.
+
+That is the right place to stop. It is a floor, not a vault, and the numbers are in the README under "The lean shell".
+
