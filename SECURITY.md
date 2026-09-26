@@ -112,6 +112,42 @@ Owner can pause deposits/withdrawals in emergency situations.
 
 **Recommendation**: Use multi-sig for owner address in production.
 
+### 6. ETH Sent to the Vault Is Locked
+
+**Limitation**: Solady's `Ownable` marks its five ownership functions `payable` to save gas, and two of them, `requestOwnershipHandover` and `cancelOwnershipHandover`, are callable by anyone. The vault has no `receive`, no `fallback` and no function that moves ETH out, and Solidity does not allow a `payable` function to be overridden as non-payable.
+
+**Risk**: Any ETH attached to one of those calls stays in the contract forever. Nothing in the vault's accounting is affected.
+
+**Mitigation**: Do not send value to the vault. Found by Slither's contract summary during the static analysis pass below.
+
+**Status**: ⚠️ Documented, not fixable without replacing the `Ownable` base
+
+## 🔍 Static Analysis
+
+Slither 0.11.6 and Aderyn 0.6.8 were run on the vault source on 2026-09-26. Both run in CI on every push. Slither uses `slither.config.json` and fails on anything of low severity or above. Aderyn uses `aderyn.toml`, which excludes exactly the detectors triaged below, and fails on any other finding. Use the [release binary](https://github.com/Cyfrin/aderyn/releases) locally, since the crates.io package is a stale 0.1.x that crashes on its own update check:
+
+```sh
+aderyn --skip-update-check -o aderyn-report.md
+```
+
+Every finding and its disposition:
+
+| Tool | Finding | Verdict |
+|---|---|---|
+| Slither | `events-maths`: `withdraw` and `redeem` change storage without an event | False positive. `Withdraw` is emitted with a raw `log4` in assembly, which Slither cannot see. Detector excluded in config |
+| Slither | `assembly`: eight functions use inline assembly | Informational, by design. Detector excluded in config |
+| Slither ERC20 check | `Transfer` and `Approval` "not emitted" | False positive. Solady emits them from assembly |
+| Slither ERC20 check | Approval race condition | Informational. Standard ERC20 behaviour, no `increaseAllowance` by design |
+| Slither summary, Aderyn H-1 | Contract can receive ETH and has no withdraw function | Real, low. Found independently by both tools. See limitation 6 above |
+| Aderyn L-1 | Centralization risk for owner | Known. See limitation 5 |
+| Aderyn L-2 | PUSH0 not supported by all chains | Real for deployment. The default profile targets cancun; use an older `evm_version` for chains without Shanghai support |
+| Aderyn L-3 | `_name` and `_symbol` could be immutable | False positive. Solidity does not allow `immutable` on `string` |
+| Aderyn L-4 | Pragma `^0.8.24` is wide | Intentional. The project compiles on 0.8.37, 0.8.36 via-IR and the zkSync-patched 0.8.30 |
+| Aderyn L-5 | Five custom errors "unused" | False positive. They are raised from assembly by selector, and every selector is asserted against its declaration in tests, which is how the wrong `ExceedsMaxCapacity` selector was found |
+| Aderyn L-6 | `MASK_96` unused | False positive. Used eleven times in assembly, which Aderyn states it does not analyze. It does duplicate `MAX_96_BITS`, a cosmetic nit left as is |
+
+Static analysis found no exploitable issue. It is not a substitute for the audit described above.
+
 ## 🐛 Reporting Vulnerabilities
 
 If you discover a security vulnerability in YulSafe:

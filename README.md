@@ -197,6 +197,8 @@ zkSync Sepolia, verified on the block explorer.
 - No yield strategy. The vault holds the asset and does nothing with it.
 - 96-bit totals. A vault that needs more than about 79 billion tokens at 18 decimals cannot use this layout.
 - Owner is a single address with pause power. Use a multisig.
+- Do not send ETH to the vault. Solady's ownership functions are payable and there is no way to move ETH back out.
+- The default profile targets the cancun EVM version and emits PUSH0. Chains without Shanghai support need an older `evm_version`.
 - **Unaudited.** See [SECURITY.md](SECURITY.md) for the threat model and how to report an issue.
 
 ## License

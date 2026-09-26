@@ -1,0 +1,20 @@
+# Aderyn configuration. Run with the release binary (the crates.io package is stale):
+#   aderyn --skip-update-check
+# Every detector excluded here fired once, was triaged, and is documented in
+# SECURITY.md under "Static Analysis". CI fails on anything that is not listed.
+version = 1
+root = "."
+src = "src"
+
+[detectors]
+exclude = [
+  "contract-locks-ether",              # real, low: Solady's payable Ownable functions, documented as limitation 6
+  "centralization-risk",               # known: single owner with pause power, documented as limitation 5
+  "push-zero-opcode",                  # real for deployment: cancun target, documented in README limitations
+  "state-variable-could-be-immutable", # false positive: Solidity has no immutable strings
+  "unspecific-solidity-pragma",        # intentional: three compiler versions across profiles
+  "unused-error",                      # false positive: errors are raised from assembly by selector, selectors are tested
+  "unused-state-variable",             # false positive: MASK_96 is used in assembly, which Aderyn does not analyze
+]
+
+[env]
