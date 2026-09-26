@@ -15,8 +15,8 @@ got their labels swapped in an earlier README.
 """
 import subprocess, re
 ops=["first_deposit","subsequent_deposit","mint","withdraw","redeem","totalAssets","convertToShares","convertToAssets"]
-vaults=[("yulsafe","YulSafeERC20"),("plain","PlainPackedVault"),("solady","SoladyVault")]
-print(f"{'call':20s} {'YulSafe':>9s} {'Plain':>9s} {'Solady':>9s}")
+vaults=[("yulsafe","YulSafeERC20"),("plain","PlainPackedVault"),("lean","LeanVault"),("solady","SoladyVault")]
+print(f"{'call':20s} {'YulSafe':>9s} {'Plain':>9s} {'Lean':>9s} {'Solady':>9s}")
 for op in ops:
     row=f"{op:20s}"
     for v,c in vaults:
