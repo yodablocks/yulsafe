@@ -124,7 +124,13 @@ Owner can pause deposits/withdrawals in emergency situations.
 
 ## 🔍 Static Analysis
 
-Slither 0.11.6 and Aderyn 0.1.9 were run on the vault source on 2026-09-26. Slither runs in CI on every push with `slither.config.json`, failing on anything of low severity or above. Every finding and its disposition:
+Slither 0.11.6 and Aderyn 0.6.8 were run on the vault source on 2026-09-26. Both run in CI on every push. Slither uses `slither.config.json` and fails on anything of low severity or above. Aderyn uses `aderyn.toml`, which excludes exactly the detectors triaged below, and fails on any other finding. Use the [release binary](https://github.com/Cyfrin/aderyn/releases) locally, since the crates.io package is a stale 0.1.x that crashes on its own update check:
+
+```sh
+aderyn --skip-update-check -o aderyn-report.md
+```
+
+Every finding and its disposition:
 
 | Tool | Finding | Verdict |
 |---|---|---|
@@ -132,14 +138,13 @@ Slither 0.11.6 and Aderyn 0.1.9 were run on the vault source on 2026-09-26. Slit
 | Slither | `assembly`: eight functions use inline assembly | Informational, by design. Detector excluded in config |
 | Slither ERC20 check | `Transfer` and `Approval` "not emitted" | False positive. Solady emits them from assembly |
 | Slither ERC20 check | Approval race condition | Informational. Standard ERC20 behaviour, no `increaseAllowance` by design |
-| Slither summary | Contract can receive ETH | Real, low. See limitation 6 above |
-| Aderyn H-1 | Uninitialized state variables `_packedVaultState`, `_paused` | False positive. Both are meant to start at zero |
+| Slither summary, Aderyn H-1 | Contract can receive ETH and has no withdraw function | Real, low. Found independently by both tools. See limitation 6 above |
 | Aderyn L-1 | Centralization risk for owner | Known. See limitation 5 |
-| Aderyn L-2 | Pragma `^0.8.24` is wide | Intentional. The project compiles on 0.8.37, 0.8.36 via-IR and the zkSync-patched 0.8.30 |
-| Aderyn L-3 | `public` functions could be `external` | Declined. They are `virtual` for extension and some are called internally |
-| Aderyn L-4 | `Deposit` event missing indexed fields | False positive. The field layout is fixed by ERC4626 |
-| Aderyn L-5 | PUSH0 not supported by all chains | Real for deployment. The default profile targets cancun; use an older `evm_version` for chains without Shanghai support |
-| Aderyn L-6 | Five custom errors "unused" | False positive. They are raised from assembly by selector, and every selector is asserted against its declaration in tests, which is how the wrong `ExceedsMaxCapacity` selector was found |
+| Aderyn L-2 | PUSH0 not supported by all chains | Real for deployment. The default profile targets cancun; use an older `evm_version` for chains without Shanghai support |
+| Aderyn L-3 | `_name` and `_symbol` could be immutable | False positive. Solidity does not allow `immutable` on `string` |
+| Aderyn L-4 | Pragma `^0.8.24` is wide | Intentional. The project compiles on 0.8.37, 0.8.36 via-IR and the zkSync-patched 0.8.30 |
+| Aderyn L-5 | Five custom errors "unused" | False positive. They are raised from assembly by selector, and every selector is asserted against its declaration in tests, which is how the wrong `ExceedsMaxCapacity` selector was found |
+| Aderyn L-6 | `MASK_96` unused | False positive. Used eleven times in assembly, which Aderyn states it does not analyze. It does duplicate `MAX_96_BITS`, a cosmetic nit left as is |
 
 Static analysis found no exploitable issue. It is not a substitute for the audit described above.
 
