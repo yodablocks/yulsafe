@@ -112,6 +112,37 @@ Owner can pause deposits/withdrawals in emergency situations.
 
 **Recommendation**: Use multi-sig for owner address in production.
 
+### 6. ETH Sent to the Vault Is Locked
+
+**Limitation**: Solady's `Ownable` marks its five ownership functions `payable` to save gas, and two of them, `requestOwnershipHandover` and `cancelOwnershipHandover`, are callable by anyone. The vault has no `receive`, no `fallback` and no function that moves ETH out, and Solidity does not allow a `payable` function to be overridden as non-payable.
+
+**Risk**: Any ETH attached to one of those calls stays in the contract forever. Nothing in the vault's accounting is affected.
+
+**Mitigation**: Do not send value to the vault. Found by Slither's contract summary during the static analysis pass below.
+
+**Status**: ⚠️ Documented, not fixable without replacing the `Ownable` base
+
+## 🔍 Static Analysis
+
+Slither 0.11.6 and Aderyn 0.1.9 were run on the vault source on 2026-09-26. Slither runs in CI on every push with `slither.config.json`, failing on anything of low severity or above. Every finding and its disposition:
+
+| Tool | Finding | Verdict |
+|---|---|---|
+| Slither | `events-maths`: `withdraw` and `redeem` change storage without an event | False positive. `Withdraw` is emitted with a raw `log4` in assembly, which Slither cannot see. Detector excluded in config |
+| Slither | `assembly`: eight functions use inline assembly | Informational, by design. Detector excluded in config |
+| Slither ERC20 check | `Transfer` and `Approval` "not emitted" | False positive. Solady emits them from assembly |
+| Slither ERC20 check | Approval race condition | Informational. Standard ERC20 behaviour, no `increaseAllowance` by design |
+| Slither summary | Contract can receive ETH | Real, low. See limitation 6 above |
+| Aderyn H-1 | Uninitialized state variables `_packedVaultState`, `_paused` | False positive. Both are meant to start at zero |
+| Aderyn L-1 | Centralization risk for owner | Known. See limitation 5 |
+| Aderyn L-2 | Pragma `^0.8.24` is wide | Intentional. The project compiles on 0.8.37, 0.8.36 via-IR and the zkSync-patched 0.8.30 |
+| Aderyn L-3 | `public` functions could be `external` | Declined. They are `virtual` for extension and some are called internally |
+| Aderyn L-4 | `Deposit` event missing indexed fields | False positive. The field layout is fixed by ERC4626 |
+| Aderyn L-5 | PUSH0 not supported by all chains | Real for deployment. The default profile targets cancun; use an older `evm_version` for chains without Shanghai support |
+| Aderyn L-6 | Five custom errors "unused" | False positive. They are raised from assembly by selector, and every selector is asserted against its declaration in tests, which is how the wrong `ExceedsMaxCapacity` selector was found |
+
+Static analysis found no exploitable issue. It is not a substitute for the audit described above.
+
 ## 🐛 Reporting Vulnerabilities
 
 If you discover a security vulnerability in YulSafe:
