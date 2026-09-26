@@ -73,3 +73,23 @@ jobs:
 
       - name: Test
         run: forge test -vvv
+
+  slither:
+    name: Slither static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1.9.1
+        with:
+          version: v1.8.3
+
+      - name: Build
+        run: forge build --build-info --skip test script
+
+      - name: Slither
+        uses: crytic/slither-action@v0.4.2
+        with:
+          ignore-compile: true
+          fail-on: low
