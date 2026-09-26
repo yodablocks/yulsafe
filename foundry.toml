@@ -8,7 +8,7 @@ optimizer = true
 optimizer_runs = 10_000_000
 via_ir = false
 ignored_warnings_from = ["lib"]
-gas_reports = ["YulSafeERC20", "SoladyVault", "PlainPackedVault", "LeanVault"]
+gas_reports = ["YulSafeERC20", "SoladyVault", "PlainPackedVault", "LeanVault", "LeanVault2"]
 
 [invariant]
 runs = 256
