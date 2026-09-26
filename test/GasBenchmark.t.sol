@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {YulSafeERC20} from "../src/YulSafeERC20.sol";
 import {SoladyVault} from "./mocks/SoladyVault.sol";
+import {PlainPackedVault} from "./mocks/PlainPackedVault.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
 /// @title GasBenchmark
@@ -12,6 +13,7 @@ import {MockERC20} from "./mocks/MockERC20.sol";
 contract GasBenchmark is Test {
     YulSafeERC20 public yulSafe;
     SoladyVault public solady;
+    PlainPackedVault public plain;
     MockERC20 public asset;
 
     address public alice = address(0x1);
@@ -24,6 +26,7 @@ contract GasBenchmark is Test {
         // Deploy both vault implementations
         yulSafe = new YulSafeERC20(address(asset), "YulSafe Vault", "ysVAULT");
         solady = new SoladyVault(address(asset), "Solady Vault", "sVAULT");
+        plain = new PlainPackedVault(address(asset), "Plain Vault", "pVAULT");
 
         // Fund alice
         asset.mint(alice, INITIAL_BALANCE);
@@ -32,6 +35,7 @@ contract GasBenchmark is Test {
         vm.startPrank(alice);
         asset.approve(address(yulSafe), type(uint256).max);
         asset.approve(address(solady), type(uint256).max);
+        asset.approve(address(plain), type(uint256).max);
         vm.stopPrank();
     }
 
@@ -199,5 +203,76 @@ contract GasBenchmark is Test {
         solady.deposit(10000e18, alice);
 
         solady.convertToAssets(1000e18);
+    }
+
+    /// @notice Benchmark plain Solidity twin first deposit
+    function test_gas_plain_first_deposit() public {
+        vm.prank(alice);
+        plain.deposit(10000e18, alice);
+    }
+
+    /// @notice Benchmark plain Solidity twin subsequent deposit
+    function test_gas_plain_subsequent_deposit() public {
+        // First deposit to initialize
+        vm.prank(alice);
+        plain.deposit(10000e18, alice);
+
+        // Benchmark subsequent deposit
+        vm.prank(alice);
+        plain.deposit(5000e18, alice);
+    }
+
+    /// @notice Benchmark plain Solidity twin withdraw
+    function test_gas_plain_withdraw() public {
+        // Setup: deposit first
+        vm.prank(alice);
+        plain.deposit(10000e18, alice);
+
+        // Benchmark withdraw
+        vm.prank(alice);
+        plain.withdraw(5000e18, alice, alice);
+    }
+
+    /// @notice Benchmark plain Solidity twin redeem
+    function test_gas_plain_redeem() public {
+        // Setup: deposit first
+        vm.prank(alice);
+        uint256 shares = plain.deposit(10000e18, alice);
+
+        // Benchmark redeem (half the shares)
+        vm.prank(alice);
+        plain.redeem(shares / 2, alice, alice);
+    }
+
+    /// @notice Benchmark plain Solidity twin mint
+    function test_gas_plain_mint() public {
+        // First deposit to initialize
+        vm.prank(alice);
+        plain.deposit(10000e18, alice);
+
+        // Benchmark mint
+        vm.prank(alice);
+        plain.mint(5000e18, alice);
+    }
+
+    /// @notice Benchmark plain Solidity twin totalAssets
+    function test_gas_plain_totalAssets() public view {
+        plain.totalAssets();
+    }
+
+    /// @notice Benchmark plain Solidity twin convertToShares
+    function test_gas_plain_convertToShares() public {
+        vm.prank(alice);
+        plain.deposit(10000e18, alice);
+
+        plain.convertToShares(1000e18);
+    }
+
+    /// @notice Benchmark plain Solidity twin convertToAssets
+    function test_gas_plain_convertToAssets() public {
+        vm.prank(alice);
+        plain.deposit(10000e18, alice);
+
+        plain.convertToAssets(1000e18);
     }
 }
