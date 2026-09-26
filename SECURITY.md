@@ -173,7 +173,7 @@ Nothing in this repository has been audited. The table records what evidence exi
 | Price manipulation | `invariant_donationsDoNotMovePrice` and `invariant_sharePriceNonDecreasing`, 25,600 handler calls per run | Independent review |
 | First-depositor attack | `fuzz/InflationAttack.t.sol`, 14 tests, victim loss asserted to be exactly zero | None beyond audit |
 | Rounding | `fuzz/RoundingProperties.t.sol`, 19 tests, plus the price-never-decreases invariant | None beyond audit |
-| ERC4626 compliance | Preview functions equal the real call, `withdraw(maxWithdraw)` and `redeem(maxRedeem)` never revert, fuzzed | A third-party property suite such as [a16z/erc4626-tests](https://github.com/a16z/erc4626-tests) |
+| ERC4626 compliance | Preview functions equal the real call, `withdraw(maxWithdraw)` and `redeem(maxRedeem)` never revert, fuzzed. [a16z/erc4626-tests](https://github.com/a16z/erc4626-tests) passes all 26 properties with `_delta_ = 0` in `test/ERC4626Std.t.sol` | None beyond audit |
 | Error selectors | Every hard-coded selector checked against the declared error in tests. A wrong `ExceedsMaxCapacity` selector was found and fixed this way | None |
 | Access control | Unit tests for owner-only pause and unpause | Adversarial review, multisig deployment guidance |
 | Pausability edge cases | Unit tests, `invariant_pauseRespectsMaxFunctions` | Review of funds locked under an indefinite pause |

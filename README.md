@@ -36,7 +36,7 @@ It is a technical showcase and a usable savings-vault primitive. It is **unaudit
 | **First-depositor protection** | The first deposit mints `MINIMUM_LIQUIDITY` (1000) shares to `address(0)`, permanently locking them, which closes the rounding edge case on a tiny first deposit. |
 | **Vault-favoring rounding** | `deposit` and `redeem` round down what the user receives. `mint` and `withdraw` round up what the user pays. Fuzz tests enforce this on every path. |
 | **Guards** | Solady `ReentrancyGuard` on all state changes, owner-only `pause` and `unpause`, zero-amount and zero-address checks. |
-| **Solady base** | ERC20, Ownable, ReentrancyGuard and SafeTransferLib from Solady, vendored in `lib/` at main commit `2afba69`. |
+| **Solady base** | ERC20, Ownable, ReentrancyGuard and SafeTransferLib from Solady, vendored in `lib/` at main commit `2afba69`. The a16z ERC4626 property suite is vendored too, test-only, under its own AGPL-3.0 license. |
 
 ## Quick start
 
@@ -153,13 +153,14 @@ Measured from transaction receipts on a local `anvil-zksync` 0.6.11 node, compil
 
 ## Tests
 
-140 tests across six suites, run in CI on every push and pull request. The same suite, minus the invariant harness, also runs in CI on the EraVM emulator through zksolc.
+166 tests across seven suites, run in CI on every push and pull request. The same suite, minus the invariant harness, also runs in CI on the EraVM emulator through zksolc.
 
 | Suite | Tests | Covers |
 |---|---|---|
 | `YulSafe.t.sol` | 62 | ERC4626 conformance, edge cases, access control |
 | `GasBenchmark.t.sol` | 16 | Side-by-side gas against Solady's ERC4626 |
 | `YulSafeHardening.t.sol` | 10 | Input bounds, preview and actual agreement, max functions never revert, consistent views inside token hooks |
+| `ERC4626Std.t.sol` | 26 | [a16z's ERC4626 property suite](https://github.com/a16z/erc4626-tests): round trips never profit, previews never over- or under-estimate, conversions are caller-independent, max functions never revert. Zero tolerance |
 | `invariants/` | 19 | Solvency, share price never decreases, donations never move the price, locked minimum liquidity, no value extraction. EVM only: the handler drives cheatcodes from a non-test contract, which the EraVM emulator does not support |
 | `fuzz/RoundingProperties.t.sol` | 19 | Every path rounds in the vault's favor |
 | `fuzz/InflationAttack.t.sol` | 14 | Victims never receive zero shares, attackers lose the locked liquidity |
