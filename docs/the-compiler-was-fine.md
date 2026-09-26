@@ -71,11 +71,10 @@ So the entire gas advantage over Solady's vault comes from layout decisions, thr
 
 While doing this I also found that the README's gas table had its first and subsequent deposit rows swapped since January. The values were right; the labels were not. Measuring each call in isolation, the way a transaction actually runs, is now a script in the repo.
 
-## Postscript 2: the lean shell
+## Postscript 2: the lean shells
 
-Once the layout was shown to be the whole trick, the obvious question was how far layout alone could go. `LeanVault` puts the two totals and the pause flag in one slot, moves the reentrancy guard to transient storage, and uses a minimal share token that reads its supply from the packed word, so supply is written once. Plain Solidity, no assembly, same 26 properties.
+Once the layout was shown to be the whole trick, the obvious question was how far layout alone could go. `LeanVault` puts the two totals and the pause flag in one slot, moves the reentrancy guard to transient storage, and uses a minimal share token that reads its supply from the packed word, so supply is written once. `LeanVault2` goes one step further and replaces the first-deposit burn with a virtual share in the price formula, the way Solady does it, and the Ownable base with a single owner slot. Plain Solidity, no assembly, the same 26 properties for both.
 
-Per transaction it is the cheapest of the four vaults on every call a user repeats, on the EVM and on EraVM, while keeping the pause, the guard and the first-deposit burn that Solady's baseline does not have. The margin on writes against Solady is small, under 3%, because the security features now cost almost nothing. It loses on two things: the first deposit, by the one cold write that locks the initial shares, and deployment, because it ships more code than a contract that does less.
+Per transaction they sit within 0.2% of Solady's baseline on every call a user repeats, while keeping the pause and the guard that the baseline does not have, and their views cost a third as much. That is the floor: what is left in a write is the asset transfer, two balance updates and the event, which every vault pays. LeanVault2 also matches Solady's first deposit to within 87 gas, because the one cold write that locked the initial shares is gone. On EraVM it is the cheapest of the five on every row.
 
-That is the right place to stop. It is a floor, not a vault, and the numbers are in the README under "The lean shell".
-
+Solady still deploys for a third less, because it does less. No vault wins every row, and the README table under "The lean shell" says which wins what. That is the right place to stop. These are floors, not vaults.

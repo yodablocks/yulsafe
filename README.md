@@ -175,38 +175,43 @@ So everything YulSafe saves against Solady, and a little more, comes from layout
 
 ## The lean shell
 
-If layout is the optimization, how cheap can the accounting layer get while keeping the pause switch, the reentrancy guard and the first-deposit burn? `test/mocks/LeanVault.sol` is the answer we could write in plain Solidity, no assembly, three ideas: the two totals and the pause flag share one slot; the reentrancy guard lives in transient storage (Solady's `ReentrancyGuardTransient`, two TSTOREs instead of a cold SLOAD and two SSTOREs); and the share token is minimal and reads its supply from the packed word, so supply is written once instead of once here and once in an ERC20 base. It passes the same 26 a16z properties. No permit on the share token.
+If layout is the optimization, how cheap can the accounting layer get while keeping the pause switch, the reentrancy guard and inflation protection? Two answers in plain Solidity, no assembly, both passing the same 26 a16z properties:
+
+- `test/mocks/LeanVault.sol`: the two totals and the pause flag share one slot; the reentrancy guard lives in transient storage (Solady's `ReentrancyGuardTransient`, two TSTOREs instead of a cold SLOAD and two SSTOREs); the share token is minimal and reads its supply from the packed word, so supply is written once. Keeps the 1000-share burn on the first deposit.
+- `test/mocks/LeanVault2.sol`: the same, with the burn replaced by one virtual share and one virtual asset in the price formula, the way Solady defends against inflation, and Solady's `Ownable` replaced by a one-slot owner. No storage write for inflation protection, less code, and no payable functions for ETH to get stuck in.
 
 Per transaction, default profile, same script as the tables above:
 
-| Call | YulSafe (Yul) | Plain twin | Lean shell | Solady ERC4626 |
-|---|---|---|---|---|
-| `deposit()` first, cold vault | 175,513 | 173,805 | 129,500 | 106,009 |
-| `deposit()` subsequent | 63,028 | 61,551 | 54,469 | 54,709 |
-| `mint()` | 63,078 | 61,740 | 54,636 | 54,735 |
-| `withdraw()` | 61,279 | 59,938 | 52,986 | 54,576 |
-| `redeem()` | 61,303 | 59,818 | 52,866 | 53,284 |
-| `totalAssets()` | 2,321 | 2,321 | 2,321 | 5,621 |
-| `convertToShares()` | 2,674 | 2,679 | 2,656 | 8,072 |
-| `convertToAssets()` | 2,675 | 2,680 | 2,680 | 8,108 |
-| Deployment gas | 1,712,163 | 2,154,694 | 1,983,630 | 1,185,598 |
+| Call | YulSafe (Yul) | Plain twin | Lean | Lean2 | Solady ERC4626 |
+|---|---|---|---|---|---|
+| `deposit()` first, cold vault | 175,513 | 173,805 | 129,500 | 106,096 | 106,009 |
+| `deposit()` subsequent | 63,028 | 61,551 | 54,469 | 54,796 | 54,709 |
+| `mint()` | 63,078 | 61,740 | 54,636 | 54,843 | 54,735 |
+| `withdraw()` | 61,279 | 59,938 | 52,986 | 53,264 | 54,576 |
+| `redeem()` | 61,303 | 59,818 | 52,866 | 53,126 | 53,284 |
+| `totalAssets()` | 2,321 | 2,321 | 2,321 | 2,321 | 5,621 |
+| `convertToShares()` | 2,674 | 2,679 | 2,656 | 3,002 | 8,072 |
+| `convertToAssets()` | 2,675 | 2,680 | 2,680 | 3,004 | 8,108 |
+| Deployment gas | 1,712,163 | 2,154,694 | 1,983,630 | 1,764,437 | 1,185,598 |
 
-On EraVM, from receipts: the lean shell is the cheapest of the four on every write, by 2 to 4% against Solady, and matches the cheapest views.
+On EraVM, from receipts, Lean2 is the cheapest of the five on every row, the first deposit included, by 2 to 4% against Solady on writes.
 
-**What this does and does not show.** On every call a user repeats, the lean shell is the cheapest of the four while carrying three security features the Solady baseline lacks. Against Solady the margin on writes is small, 0.4 to 3%, because those features now cost almost nothing: the pause check is a warm read of a slot already loaded, the guard is two transient stores, and supply is one write. The views keep the packed-slot advantage. Two places it does not win, and why: the first deposit into an empty vault costs 22,000 gas more, which is the one-time cold write of the locked shares to `address(0)`, and deployment costs 67% more, because it ships more code than a baseline that does less. Under via-IR at 200 runs the runtime shrinks to 5,812 bytes against Solady's 4,235, and `mint` becomes 91 gas dearer than Solady while the other writes stay cheaper.
+**What this does and does not show.** On every call a user repeats, both lean shells sit within 0.2% of Solady's baseline while carrying a pause switch and a reentrancy guard that the baseline lacks, and their views cost a third of Solady's. That is the floor: what remains in a write is the asset transfer, two balance updates and the event, which every vault pays. The two shells trade the last few hundred gas against each other. Lean wins repeated writes by a hair; Lean2 wins the first deposit outright, by removing the one cold write that locked the initial shares, and deployment by 11%, by shipping less code. Lean2's views cost about 330 gas more because the virtual offset adds two additions to every conversion.
 
-This is a shell, not a product. A vault that generates yield spends most of its gas on the yield, not on the accounting. What the lean shell offers a real vault is a cheaper floor: the same layout and guard save the same few thousand gas on every deposit, whatever sits on top.
+No vault wins every row. Solady still deploys for 33% less because it does less. Under via-IR at 200 runs, Lean2 beats Solady on every write except `mint`, by 76 gas, and its runtime is 5,202 bytes against Solady's 4,235.
+
+These are shells, not products. A vault that generates yield spends most of its gas on the yield, not on the accounting. What the shells offer a real vault is a cheaper floor: the same layout, guard and offset save the same few thousand gas on every deposit, whatever sits on top.
 
 ## Tests
 
-234 tests across ten suites, run in CI on every push and pull request. The same suite, minus the invariant harness, also runs in CI on the EraVM emulator through zksolc.
+268 tests across eleven suites, run in CI on every push and pull request. The same suite, minus the invariant harness, also runs in CI on the EraVM emulator through zksolc.
 
 | Suite | Tests | Covers |
 |---|---|---|
 | `YulSafe.t.sol` | 62 | ERC4626 conformance, edge cases, access control |
-| `GasBenchmark.t.sol` | 32 | Side-by-side gas against Solady's ERC4626, the plain Solidity twin and the lean shell |
+| `GasBenchmark.t.sol` | 40 | Side-by-side gas against Solady's ERC4626, the plain Solidity twin and the two lean shells |
 | `YulSafeHardening.t.sol` | 10 | Input bounds, preview and actual agreement, max functions never revert, consistent views inside token hooks |
-| `ERC4626Std.t.sol`, `PlainPackedVaultStd.t.sol`, `LeanVaultStd.t.sol` | 26 + 26 + 26 | [a16z's ERC4626 property suite](https://github.com/a16z/erc4626-tests): round trips never profit, previews never over- or under-estimate, conversions are caller-independent, max functions never revert. Zero tolerance |
+| `ERC4626Std.t.sol`, `PlainPackedVaultStd.t.sol`, `LeanVaultStd.t.sol`, `LeanVault2Std.t.sol` | 4 × 26 | [a16z's ERC4626 property suite](https://github.com/a16z/erc4626-tests): round trips never profit, previews never over- or under-estimate, conversions are caller-independent, max functions never revert. Zero tolerance |
 | `invariants/` | 19 | Solvency, share price never decreases, donations never move the price, locked minimum liquidity, no value extraction. EVM only: the handler drives cheatcodes from a non-test contract, which the EraVM emulator does not support |
 | `fuzz/RoundingProperties.t.sol` | 19 | Every path rounds in the vault's favor |
 | `fuzz/InflationAttack.t.sol` | 14 | Victims never receive zero shares, attackers lose the locked liquidity |
