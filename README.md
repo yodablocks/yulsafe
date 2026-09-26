@@ -170,6 +170,10 @@ FOUNDRY_INVARIANT_RUNS=1000 forge test --match-contract YulSafeInvariants
 forge test --match-path "test/fuzz/*" --fuzz-runs 1000
 ```
 
+## Write-up
+
+[The compiler was fine. My vault was not.](docs/the-compiler-was-fine.md) tells the story of the September 2026 refresh: a placeholder README, a wrong error selector, a gas claim measured on the wrong chain, and a byte-identical result on a compiler written from scratch in Zig.
+
 ## Compiler conformance
 
 YulSafe doubles as a real-world test input for [oksolc](https://github.com/okcontract/oksolc), a from-scratch Solidity compiler in Zig that targets byte-compatibility with solc 0.8.36 on the optimized via-IR path. The `viair` profile builds this project the way oksolc supports, and `script/compare-oksolc.py` diffs the artifacts of two compilers byte for byte:
