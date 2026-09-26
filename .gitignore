@@ -16,6 +16,9 @@ lcov.info
 # Flattened contracts (generated, not needed in repo)
 *_flattened.sol
 
+# Local zkSync node log written into the working directory by anvil-zksync
+anvil-zksync.log
+
 # Installation scripts (foundry-zksync installer artifacts)
 foundryup-zksync
 install
