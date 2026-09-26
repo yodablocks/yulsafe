@@ -20,7 +20,7 @@ A standard ERC4626 vault reads `totalAssets` and `totalSupply` from two storage 
 YulSafe makes three changes and keeps everything else standard:
 
 - **One slot, two values.** `totalAssets` and `totalSupply` live in the same 256-bit word as two 96-bit fields. Every read is one SLOAD, every update is one SSTORE.
-- **Assembly on the hot path.** Share conversions, packing and unpacking, and event emission are written in Yul, so no ABI encoder, no memory expansion, no redundant bounds checks.
+- **Assembly on the hot path.** Share conversions, packing and unpacking, and event emission are written in Yul. Measured against a plain Solidity twin with the same layout, the assembly buys nothing at runtime; see [Did the assembly matter?](#did-the-assembly-matter) below. The layout is the optimization.
 - **Security is not the trade-off.** The vault never reads its own token balance, so sending tokens to it directly cannot move the share price and the classic ERC4626 donation attack is inert. Minimum liquidity is burned on the first deposit, all rounding favors the vault, and every state-changing function is reentrancy guarded and pausable.
 
 It is a technical showcase and a usable savings-vault primitive. It is **unaudited**. Read the [security policy](SECURITY.md) before touching real funds.
@@ -151,16 +151,36 @@ Measured from transaction receipts on a local `anvil-zksync` 0.6.11 node, compil
 
 **Read this honestly.** The 67% view saving on the EVM does not carry over. EraVM charges every transaction a large fixed cost for the bootloader and for publishing state to L1, and a storage read is cheap relative to that. Saving one SLOAD moves the total by single-digit percentages, and the extra security checks on the write path cost about as much as they do on the EVM. YulSafe runs correctly on zkSync Era under the same test suite, but on today's EraVM its gas edge is small. The packed-slot technique is an EVM optimization first, which is why the project now describes itself that way.
 
+## Did the assembly matter?
+
+`test/mocks/PlainPackedVault.sol` is YulSafe rewritten in plain Solidity with zero assembly: two `uint96` fields the compiler packs into one slot on its own, the same checks, rounding, first-deposit burn, events and errors. It passes the same 26 a16z ERC4626 properties. Same benchmark, same calls, solc 0.8.37, optimizer at 10,000,000 runs:
+
+| Function | YulSafe (Yul) | Plain Solidity | Solady ERC4626 |
+|---|---|---|---|
+| `totalAssets()` | 2,321 | 2,321 | 5,621 |
+| `convertToShares()` | 2,674 | 2,679 | 8,072 |
+| `convertToAssets()` | 2,675 | 2,680 | 8,108 |
+| `deposit()` first | 63,028 | 61,551 | 54,709 |
+| `deposit()` subsequent | 175,513 | 173,805 | 106,009 |
+| `mint()` | 63,078 | 61,740 | 54,735 |
+| `withdraw()` | 61,279 | 59,938 | 54,576 |
+| `redeem()` | 61,303 | 59,818 | 53,284 |
+| Deployment gas | 1,712,163 | 2,154,694 | 1,185,598 |
+
+On EraVM, from transaction receipts with the same script as above, the twin is about 1% cheaper than YulSafe on every write and identical on every view.
+
+**The honest reading.** The views are equal to within five gas: the compiler emits one SLOAD for two adjacent `uint96` fields without any help. The plain version is 1,300 to 1,500 gas cheaper on every write. The only thing the hand-written Yul buys is a smaller deployment, and under via-IR even that gap shrinks to 2%. Everything YulSafe saves against Solady comes from putting both totals in one slot, which is a layout decision any Solidity programmer can make in two lines. The assembly is a showcase of technique, not a source of savings. The vault keeps it because that is what the project is for, and this section exists so nobody copies the assembly expecting a gas win.
+
 ## Tests
 
-166 tests across seven suites, run in CI on every push and pull request. The same suite, minus the invariant harness, also runs in CI on the EraVM emulator through zksolc.
+200 tests across nine suites, run in CI on every push and pull request. The same suite, minus the invariant harness, also runs in CI on the EraVM emulator through zksolc.
 
 | Suite | Tests | Covers |
 |---|---|---|
 | `YulSafe.t.sol` | 62 | ERC4626 conformance, edge cases, access control |
-| `GasBenchmark.t.sol` | 16 | Side-by-side gas against Solady's ERC4626 |
+| `GasBenchmark.t.sol` | 24 | Side-by-side gas against Solady's ERC4626 and the plain Solidity twin |
 | `YulSafeHardening.t.sol` | 10 | Input bounds, preview and actual agreement, max functions never revert, consistent views inside token hooks |
-| `ERC4626Std.t.sol` | 26 | [a16z's ERC4626 property suite](https://github.com/a16z/erc4626-tests): round trips never profit, previews never over- or under-estimate, conversions are caller-independent, max functions never revert. Zero tolerance |
+| `ERC4626Std.t.sol`, `PlainPackedVaultStd.t.sol` | 26 + 26 | [a16z's ERC4626 property suite](https://github.com/a16z/erc4626-tests): round trips never profit, previews never over- or under-estimate, conversions are caller-independent, max functions never revert. Zero tolerance |
 | `invariants/` | 19 | Solvency, share price never decreases, donations never move the price, locked minimum liquidity, no value extraction. EVM only: the handler drives cheatcodes from a non-test contract, which the EraVM emulator does not support |
 | `fuzz/RoundingProperties.t.sol` | 19 | Every path rounds in the vault's favor |
 | `fuzz/InflationAttack.t.sol` | 14 | Victims never receive zero shares, attackers lose the locked liquidity |
