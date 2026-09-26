@@ -6,6 +6,7 @@ import {YulSafeERC20} from "../src/YulSafeERC20.sol";
 import {SoladyVault} from "./mocks/SoladyVault.sol";
 import {PlainPackedVault} from "./mocks/PlainPackedVault.sol";
 import {LeanVault} from "./mocks/LeanVault.sol";
+import {LeanVault2} from "./mocks/LeanVault2.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
 /// @title GasBenchmark
@@ -16,6 +17,7 @@ contract GasBenchmark is Test {
     SoladyVault public solady;
     PlainPackedVault public plain;
     LeanVault public lean;
+    LeanVault2 public lean2;
     MockERC20 public asset;
 
     address public alice = address(0x1);
@@ -30,6 +32,7 @@ contract GasBenchmark is Test {
         solady = new SoladyVault(address(asset), "Solady Vault", "sVAULT");
         plain = new PlainPackedVault(address(asset), "Plain Vault", "pVAULT");
         lean = new LeanVault(address(asset), "Lean Vault", "lVAULT");
+        lean2 = new LeanVault2(address(asset), "Lean Vault 2", "lVAULT2");
 
         // Fund alice
         asset.mint(alice, INITIAL_BALANCE);
@@ -40,6 +43,7 @@ contract GasBenchmark is Test {
         asset.approve(address(solady), type(uint256).max);
         asset.approve(address(plain), type(uint256).max);
         asset.approve(address(lean), type(uint256).max);
+        asset.approve(address(lean2), type(uint256).max);
         vm.stopPrank();
     }
 
@@ -349,5 +353,76 @@ contract GasBenchmark is Test {
         lean.deposit(10000e18, alice);
 
         lean.convertToAssets(1000e18);
+    }
+
+    /// @notice Benchmark lean shell v2 first deposit
+    function test_gas_lean2_first_deposit() public {
+        vm.prank(alice);
+        lean2.deposit(10000e18, alice);
+    }
+
+    /// @notice Benchmark lean shell v2 subsequent deposit
+    function test_gas_lean2_subsequent_deposit() public {
+        // First deposit to initialize
+        vm.prank(alice);
+        lean2.deposit(10000e18, alice);
+
+        // Benchmark subsequent deposit
+        vm.prank(alice);
+        lean2.deposit(5000e18, alice);
+    }
+
+    /// @notice Benchmark lean shell v2 withdraw
+    function test_gas_lean2_withdraw() public {
+        // Setup: deposit first
+        vm.prank(alice);
+        lean2.deposit(10000e18, alice);
+
+        // Benchmark withdraw
+        vm.prank(alice);
+        lean2.withdraw(5000e18, alice, alice);
+    }
+
+    /// @notice Benchmark lean shell v2 redeem
+    function test_gas_lean2_redeem() public {
+        // Setup: deposit first
+        vm.prank(alice);
+        uint256 shares = lean2.deposit(10000e18, alice);
+
+        // Benchmark redeem (half the shares)
+        vm.prank(alice);
+        lean2.redeem(shares / 2, alice, alice);
+    }
+
+    /// @notice Benchmark lean shell v2 mint
+    function test_gas_lean2_mint() public {
+        // First deposit to initialize
+        vm.prank(alice);
+        lean2.deposit(10000e18, alice);
+
+        // Benchmark mint
+        vm.prank(alice);
+        lean2.mint(5000e18, alice);
+    }
+
+    /// @notice Benchmark lean shell v2 totalAssets
+    function test_gas_lean2_totalAssets() public view {
+        lean2.totalAssets();
+    }
+
+    /// @notice Benchmark lean shell v2 convertToShares
+    function test_gas_lean2_convertToShares() public {
+        vm.prank(alice);
+        lean2.deposit(10000e18, alice);
+
+        lean2.convertToShares(1000e18);
+    }
+
+    /// @notice Benchmark lean shell v2 convertToAssets
+    function test_gas_lean2_convertToAssets() public {
+        vm.prank(alice);
+        lean2.deposit(10000e18, alice);
+
+        lean2.convertToAssets(1000e18);
     }
 }
