@@ -695,8 +695,14 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
     /// @return Maximum mint amount
     function maxMint(address) public view virtual returns (uint256) {
         if (_paused != 0) return 0;
-        (, uint256 supply_) = _vaultState();
-        return MAX_96_BITS - supply_;
+        (uint256 assets_, uint256 supply_) = _vaultState();
+        // The first mint also pays for the locked MINIMUM_LIQUIDITY
+        if (supply_ == 0) return MAX_96_BITS - MINIMUM_LIQUIDITY;
+
+        // Both lanes must fit: supply + shares, and assets + ceil(shares * assets / supply)
+        uint256 bySupply = MAX_96_BITS - supply_;
+        uint256 byAssets = ((MAX_96_BITS - assets_) * supply_) / assets_;
+        return bySupply < byAssets ? bySupply : byAssets;
     }
 
     /// @notice Maximum withdraw for user

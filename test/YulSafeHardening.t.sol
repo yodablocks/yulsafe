@@ -230,4 +230,44 @@ contract YulSafeHardening is Test {
         vm.expectRevert(bytes4(0x82b42900)); // Ownable.Unauthorized()
         vault.renounceOwnership();
     }
+
+    /*//////////////////////////////////////////////////////////////
+                           MAX FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice On an empty vault, mint(maxMint) succeeds and one share more reverts.
+    ///         maxMint used to ignore the locked MINIMUM_LIQUIDITY and overstate by 1000.
+    function test_maxMintIsExactOnEmptyVault() public {
+        asset.mint(alice, MAX_96_BITS);
+        uint256 max = vault.maxMint(alice);
+
+        uint256 snap = vm.snapshotState();
+        vm.prank(alice);
+        vm.expectRevert(YulSafeERC20.ExceedsMaxCapacity.selector);
+        vault.mint(max + 1, alice);
+        vm.revertToState(snap);
+
+        vm.prank(alice);
+        vault.mint(max, alice);
+        assertEq(vault.totalAssets(), MAX_96_BITS);
+        assertEq(vault.maxMint(alice), 0);
+    }
+
+    /// @notice On a funded vault, mint(maxMint) succeeds and one share more reverts
+    function test_maxMintIsExactOnFundedVault() public {
+        asset.mint(alice, MAX_96_BITS);
+        vm.prank(alice);
+        vault.deposit(1e24, alice);
+        uint256 max = vault.maxMint(alice);
+
+        uint256 snap = vm.snapshotState();
+        vm.prank(alice);
+        vm.expectRevert(YulSafeERC20.ExceedsMaxCapacity.selector);
+        vault.mint(max + 1, alice);
+        vm.revertToState(snap);
+
+        vm.prank(alice);
+        vault.mint(max, alice);
+        assertEq(vault.maxMint(alice), 0);
+    }
 }
