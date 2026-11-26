@@ -125,7 +125,7 @@ Owner can pause deposits/withdrawals in emergency situations.
 
 ## 🔍 Static Analysis
 
-Slither 0.11.6 and Aderyn 0.6.8 were run on the vault source on 2026-09-26. Both run in CI on every push. Slither uses `slither.config.json` and fails on anything of low severity or above. Aderyn uses `aderyn.toml`, which excludes exactly the detectors triaged below, and fails on any other finding. Use the [release binary](https://github.com/Cyfrin/aderyn/releases) locally, since the crates.io package is a stale 0.1.x that crashes on its own update check:
+Slither 0.11.6 and Aderyn 0.6.8 were run on the vault source on 2026-09-26. Both run in CI on every push. Slither uses `slither.config.json` and fails on anything of low severity or above. Aderyn uses `aderyn.toml`, which excludes exactly the detectors triaged below, and fails on any other finding. Cyfrin has since removed the prebuilt binaries from the 0.6.8 release, so CI builds it from the release's `source.tar.gz`, pinned by SHA-256. Build it the same way locally (`cargo build --release --locked -p aderyn` inside the extracted tarball), since the crates.io package is a stale 0.1.x that crashes on its own update check:
 
 ```sh
 aderyn --skip-update-check -o aderyn-report.md
