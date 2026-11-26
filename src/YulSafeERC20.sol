@@ -122,6 +122,9 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
     /// @notice Insufficient assets in vault for withdrawal
     error InsufficientAssets();
 
+    /// @notice Ownership cannot be renounced, see renounceOwnership()
+    error RenounceOwnershipDisabled();
+
     /*//////////////////////////////////////////////////////////////
                              CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -692,8 +695,14 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
     /// @return Maximum mint amount
     function maxMint(address) public view virtual returns (uint256) {
         if (_paused != 0) return 0;
-        (, uint256 supply_) = _vaultState();
-        return MAX_96_BITS - supply_;
+        (uint256 assets_, uint256 supply_) = _vaultState();
+        // The first mint also pays for the locked MINIMUM_LIQUIDITY
+        if (supply_ == 0) return MAX_96_BITS - MINIMUM_LIQUIDITY;
+
+        // Both lanes must fit: supply + shares, and assets + ceil(shares * assets / supply)
+        uint256 bySupply = MAX_96_BITS - supply_;
+        uint256 byAssets = ((MAX_96_BITS - assets_) * supply_) / assets_;
+        return bySupply < byAssets ? bySupply : byAssets;
     }
 
     /// @notice Maximum withdraw for user
@@ -723,12 +732,11 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             // Set paused state to 1
             sstore(_paused.slot, 1)
 
-            // Emit Paused event
-            // event Paused()
+            // Emit the declared PausedEvent(), no data
             log1(
                 0x00,
                 0x00,
-                0x62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a258 // keccak256("Paused()")
+                0x7a81fbd03590051e5303bffa6481eb76ac6081d4a2d96aca8b1af9b5c8028fed // keccak256("PausedEvent()")
             )
         }
     }
@@ -740,14 +748,22 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             // Set paused state to 0
             sstore(_paused.slot, 0)
 
-            // Emit Unpaused event
-            // event Unpaused()
+            // Emit the declared UnpausedEvent(), no data
             log1(
                 0x00,
                 0x00,
-                0x5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa // keccak256("Unpaused()")
+                0x06816474b0021c4d07945d434c3c6403f2e1f70120c8c7b43993bd36805d03ef // keccak256("UnpausedEvent()")
             )
         }
+    }
+
+    /// @notice Disabled. Renouncing while paused would leave nobody able to
+    ///         unpause, locking every deposit in the vault for good.
+    /// @dev Stays payable because Solidity does not allow a payable function
+    ///      to be overridden as non-payable. Ownership can still be moved with
+    ///      transferOwnership or the two-step handover.
+    function renounceOwnership() public payable virtual override onlyOwner {
+        revert RenounceOwnershipDisabled();
     }
 
     /// @notice Check if contract is paused
