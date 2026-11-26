@@ -239,26 +239,24 @@ As of September 2026, oksolc built from `main` produces creation bytecode, runti
 
 ## Deployed contracts
 
-zkSync Sepolia, deployed 2026-09-26 from the v0.2.0 contract code, compiled with zksolc 1.5.15 and the zkSync-patched solc 0.8.30 through the `zksync` profile. Both are verified on the explorer. The vault is owned by `0xEAAEB8ddcf1772ca76c701C68C37b63DC89861cf`.
-
-This deployment predates the fixes in [#21](https://github.com/yodablocks/yulsafe/pull/21) (pause events, `renounceOwnership` disabled, `maxMint` bound on an empty vault). It has not been redeployed since.
+zkSync Sepolia, deployed 2026-11-26 from commit `82dc4ef`, which includes the fixes in [#21](https://github.com/yodablocks/yulsafe/pull/21). Compiled with zksolc 1.5.15 and the zkSync-patched solc 0.8.30 through the `zksync` profile. The vault is verified on the explorer and owned by `0xd81C68AaB0BaB549Df728e8Fbb7a3706024EA171`. It uses the same mUSDC token as the previous deployment.
 
 | Contract | Address |
 |---|---|
-| YulSafe vault | [`0x7EC180309204B56d9425eb0509A1D8EBd5FD278f`](https://sepolia.explorer.zksync.io/address/0x7EC180309204B56d9425eb0509A1D8EBd5FD278f) |
+| YulSafe vault | [`0x8A3F775eFc185081cEC1AC37ff657036FDa26285`](https://sepolia.explorer.zksync.io/address/0x8A3F775eFc185081cEC1AC37ff657036FDa26285) |
 | MockERC20 (mUSDC, 6 decimals) | [`0x8874f8524eFf97b272CdF1cB472dB8fb66e0B133`](https://sepolia.explorer.zksync.io/address/0x8874f8524eFf97b272CdF1cB472dB8fb66e0B133) |
 
 Example transactions on that deployment, gas as reported in the receipts:
 
 | Action | Transaction | Gas used |
 |---|---|---|
-| Approve vault | [`0x1958e337…9200d1`](https://sepolia.explorer.zksync.io/tx/0x1958e337ef8fd4c8c9b1ab1e5184436b5c7d01cdc0f8fc5696da6492f59200d1) | 92,462 |
-| Deposit 500 mUSDC, first deposit | [`0x1d079799…a70e86`](https://sepolia.explorer.zksync.io/tx/0x1d079799960a1047bde56a1ff74d8b627ff26b1c1f21e23712a459397fa70e86) | 144,720 |
-| Withdraw 100 mUSDC | [`0xc282414c…72b97f`](https://sepolia.explorer.zksync.io/tx/0xc282414c97c87512457a4b6bda029996de46eb2b01796cac5db3ebd35e72b97f) | 90,915 |
+| Approve vault | [`0xc11df66a…d12bbc`](https://sepolia.explorer.zksync.io/tx/0xc11df66a5279522633b447bb3f6b904a58abc509b4db2867c163bd9123d12bbc) | 88,801 |
+| Deposit 500 mUSDC, first deposit | [`0xfa24147f…df2028`](https://sepolia.explorer.zksync.io/tx/0xfa24147f0902400a837cb42b8317f646cd45c3a3cab0a692aa13430073df2028) | 135,609 |
+| Withdraw 100 mUSDC | [`0xc4e7b470…692343`](https://sepolia.explorer.zksync.io/tx/0xc4e7b470c5bc9a03ed41683fb884387b787b8bc356a66bfee94d932d24692343) | 87,608 |
 
 After those two calls the vault holds 400 mUSDC against 400,000,000 shares, of which 1,000 are locked at `address(0)`.
 
-Verification goes through `script/verify-zksync.py`, because foundry-zksync's built-in verifier sends settings the explorer rejects. The previous deployment from January 2026 at `0xdbB4C8d522Ba83a43ADa63f8555B3b47b40cc5ee` predates the fixes in v0.2.0 and should not be used.
+Verification goes through `script/verify-zksync.py`, because foundry-zksync's built-in verifier sends settings the explorer rejects. Earlier deployments should not be used: `0x7EC180309204B56d9425eb0509A1D8EBd5FD278f` (v0.2.0, September 2026) predates #21, and `0xdbB4C8d522Ba83a43ADa63f8555B3b47b40cc5ee` (January 2026) predates the fixes in v0.2.0.
 
 ## Limitations
 
