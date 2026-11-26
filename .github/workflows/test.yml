@@ -101,12 +101,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Aderyn 0.6.8
+      # Cyfrin removed the prebuilt binaries from the 0.6.8 release, so build it
+      # from the release source tarball, pinned by hash. rust-toolchain.toml in
+      # the tarball pins the nightly, and --locked holds Cargo.lock, which pins
+      # the one git dependency to a commit. The binary is cached by source hash.
+      - name: Cache Aderyn 0.6.8 build
+        id: aderyn-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/aderyn-bin
+          key: aderyn-0.6.8-src-2d4afdb52bae30f8488e5d9470a281d284c0b286455b61b474e6c2e7dafe343a
+
+      - name: Build Aderyn 0.6.8 from source
+        if: steps.aderyn-cache.outputs.cache-hit != 'true'
         run: |
-          curl -sL -o aderyn.tar.xz https://github.com/Cyfrin/aderyn/releases/download/aderyn-v0.6.8/aderyn-x86_64-unknown-linux-gnu.tar.xz
-          echo "ffd6ca658962e211a3ac821c646f69c8e14bf1b1001cbfe091bcd4535a691e46  aderyn.tar.xz" | sha256sum -c -
-          tar xf aderyn.tar.xz
-          echo "$PWD/aderyn-x86_64-unknown-linux-gnu" >> "$GITHUB_PATH"
+          mkdir -p ~/aderyn-src ~/aderyn-bin
+          cd ~/aderyn-src
+          curl -fsSL -o source.tar.gz https://github.com/Cyfrin/aderyn/releases/download/aderyn-v0.6.8/source.tar.gz
+          echo "2d4afdb52bae30f8488e5d9470a281d284c0b286455b61b474e6c2e7dafe343a  source.tar.gz" | sha256sum -c -
+          tar xzf source.tar.gz
+          cd aderyn-0.6.8
+          cargo build --release --locked -p aderyn --bin aderyn
+          cp target/release/aderyn ~/aderyn-bin/
+
+      - name: Put Aderyn on the path
+        run: |
+          echo "$HOME/aderyn-bin" >> "$GITHUB_PATH"
+          "$HOME/aderyn-bin/aderyn" --version
 
       - name: Aderyn
         run: aderyn --skip-update-check -o aderyn-report.json
