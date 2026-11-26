@@ -130,7 +130,7 @@ Per-transaction gas of each call, solc 0.8.37 targeting cancun, optimizer on at 
 | `withdraw()` | 61,279 | 54,576 | +12% |
 | `redeem()` | 61,303 | 53,284 | +15% |
 
-Deployment: 1,712,163 gas, 8,391 bytes.
+Deployment: 1,747,314 gas, 8,555 bytes.
 
 The view functions are where the packed slot pays off. State-changing calls cost 12 to 15% more than Solady's base vault because they carry a reentrancy guard, a pause check and the minimum-liquidity burn, none of which the Solady baseline has. The first deposit into an empty vault is a one-time cost that initializes those extra slots.
 
@@ -165,11 +165,11 @@ Measured from transaction receipts on a local `anvil-zksync` 0.6.11 node, compil
 | `mint()` | 63,078 | 61,740 | 54,735 |
 | `withdraw()` | 61,279 | 59,938 | 54,576 |
 | `redeem()` | 61,303 | 59,818 | 53,284 |
-| Deployment gas | 1,712,163 | 2,154,694 | 1,185,598 |
+| Deployment gas | 1,747,314 | 2,154,694 | 1,185,598 |
 
 On EraVM, from transaction receipts with the same script as above, the twin is about 1% cheaper than YulSafe on every write and identical on every view.
 
-**The honest reading.** The views are equal to within five gas: the compiler emits one SLOAD for two adjacent `uint96` fields without any help. On writes the two effects pull in opposite directions. The hand-written Yul saves about 600 gas of execution per write, visible when the same call is measured with warm storage. The plain twin declares its pause flag next to the two totals, so the compiler packs all three into one slot and every write does one cold SLOAD fewer, worth about 2,000 gas. Net per transaction, the plain version is 1,300 to 1,500 gas cheaper. The only thing the Yul wins outright is deployment size, and under via-IR that gap is 2%.
+**The honest reading.** The views are equal to within five gas: the compiler emits one SLOAD for two adjacent `uint96` fields without any help. On writes the two effects pull in opposite directions. The hand-written Yul saves about 600 gas of execution per write, visible when the same call is measured with warm storage. The plain twin declares its pause flag next to the two totals, so the compiler packs all three into one slot and every write does one cold SLOAD fewer, worth about 2,000 gas. Net per transaction, the plain version is 1,300 to 1,500 gas cheaper. The only thing the Yul wins outright is deployment size, and under via-IR that gap is 1%.
 
 So everything YulSafe saves against Solady, and a little more, comes from layout: two totals in one slot, and the pause flag beside them. Both are declarations any Solidity programmer can write. The assembly is worth a few hundred gas of technique and cost this project its one real bug. The vault keeps it because that is what the project is for, and this section exists so nobody copies the assembly expecting a gas win.
 
@@ -192,7 +192,7 @@ Per transaction, default profile, same script as the tables above:
 | `totalAssets()` | 2,321 | 2,321 | 2,321 | 2,321 | 5,621 |
 | `convertToShares()` | 2,674 | 2,679 | 2,656 | 3,002 | 8,072 |
 | `convertToAssets()` | 2,675 | 2,680 | 2,680 | 3,004 | 8,108 |
-| Deployment gas | 1,712,163 | 2,154,694 | 1,983,630 | 1,764,437 | 1,185,598 |
+| Deployment gas | 1,747,314 | 2,154,694 | 1,983,630 | 1,764,437 | 1,185,598 |
 
 On EraVM, from receipts, Lean2 is the cheapest of the five on every row, the first deposit included, by 2 to 4% against Solady on writes.
 
@@ -240,6 +240,8 @@ As of September 2026, oksolc built from `main` produces creation bytecode, runti
 ## Deployed contracts
 
 zkSync Sepolia, deployed 2026-09-26 from the v0.2.0 contract code, compiled with zksolc 1.5.15 and the zkSync-patched solc 0.8.30 through the `zksync` profile. Both are verified on the explorer. The vault is owned by `0xEAAEB8ddcf1772ca76c701C68C37b63DC89861cf`.
+
+This deployment predates the fixes in [#21](https://github.com/yodablocks/yulsafe/pull/21) (pause events, `renounceOwnership` disabled, `maxMint` bound on an empty vault). It has not been redeployed since.
 
 | Contract | Address |
 |---|---|
