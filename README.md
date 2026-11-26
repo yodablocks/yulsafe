@@ -241,6 +241,8 @@ As of September 2026, oksolc built from `main` produces creation bytecode, runti
 
 zkSync Sepolia, deployed 2026-09-26 from the v0.2.0 contract code, compiled with zksolc 1.5.15 and the zkSync-patched solc 0.8.30 through the `zksync` profile. Both are verified on the explorer. The vault is owned by `0xEAAEB8ddcf1772ca76c701C68C37b63DC89861cf`.
 
+This deployment predates the fixes in [#21](https://github.com/yodablocks/yulsafe/pull/21) (pause events, `renounceOwnership` disabled, `maxMint` bound on an empty vault). It has not been redeployed since.
+
 | Contract | Address |
 |---|---|
 | YulSafe vault | [`0x7EC180309204B56d9425eb0509A1D8EBd5FD278f`](https://sepolia.explorer.zksync.io/address/0x7EC180309204B56d9425eb0509A1D8EBd5FD278f) |
