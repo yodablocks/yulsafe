@@ -195,4 +195,20 @@ contract YulSafeHardening is Test {
         assertEq(hooked.priceSeenInHook(), priceAfter, "hook observed a transient price");
         assertEq(hooked.totalsRatioSeenInHook(), priceAfter, "hook observed inconsistent totals");
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSE EVENTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice pause() and unpause() emit the events the ABI declares, not
+    ///         OpenZeppelin's Paused(address) and Unpaused(address) topics
+    function test_pauseEventsMatchDeclaredAbi() public {
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit YulSafeERC20.PausedEvent();
+        vault.pause();
+
+        vm.expectEmit(false, false, false, true, address(vault));
+        emit YulSafeERC20.UnpausedEvent();
+        vault.unpause();
+    }
 }

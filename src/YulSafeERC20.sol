@@ -723,12 +723,11 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             // Set paused state to 1
             sstore(_paused.slot, 1)
 
-            // Emit Paused event
-            // event Paused()
+            // Emit the declared PausedEvent(), no data
             log1(
                 0x00,
                 0x00,
-                0x62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a258 // keccak256("Paused()")
+                0x7a81fbd03590051e5303bffa6481eb76ac6081d4a2d96aca8b1af9b5c8028fed // keccak256("PausedEvent()")
             )
         }
     }
@@ -740,12 +739,11 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
             // Set paused state to 0
             sstore(_paused.slot, 0)
 
-            // Emit Unpaused event
-            // event Unpaused()
+            // Emit the declared UnpausedEvent(), no data
             log1(
                 0x00,
                 0x00,
-                0x5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa // keccak256("Unpaused()")
+                0x06816474b0021c4d07945d434c3c6403f2e1f70120c8c7b43993bd36805d03ef // keccak256("UnpausedEvent()")
             )
         }
     }
