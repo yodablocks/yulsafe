@@ -122,6 +122,9 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
     /// @notice Insufficient assets in vault for withdrawal
     error InsufficientAssets();
 
+    /// @notice Ownership cannot be renounced, see renounceOwnership()
+    error RenounceOwnershipDisabled();
+
     /*//////////////////////////////////////////////////////////////
                              CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -746,6 +749,15 @@ contract YulSafeERC20 is ERC20, Ownable, ReentrancyGuard {
                 0x06816474b0021c4d07945d434c3c6403f2e1f70120c8c7b43993bd36805d03ef // keccak256("UnpausedEvent()")
             )
         }
+    }
+
+    /// @notice Disabled. Renouncing while paused would leave nobody able to
+    ///         unpause, locking every deposit in the vault for good.
+    /// @dev Stays payable because Solidity does not allow a payable function
+    ///      to be overridden as non-payable. Ownership can still be moved with
+    ///      transferOwnership or the two-step handover.
+    function renounceOwnership() public payable virtual override onlyOwner {
+        revert RenounceOwnershipDisabled();
     }
 
     /// @notice Check if contract is paused

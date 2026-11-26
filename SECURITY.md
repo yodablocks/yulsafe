@@ -107,6 +107,7 @@ Owner can pause deposits/withdrawals in emergency situations.
 **Limitation**: Owner has significant control:
 - Can pause/unpause the vault
 - Can transfer ownership
+- Cannot renounce ownership: `renounceOwnership` reverts, so a pause can never be left with nobody able to lift it
 
 **Risk**: Compromised owner key could freeze user funds via pause.
 

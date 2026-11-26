@@ -211,4 +211,23 @@ contract YulSafeHardening is Test {
         emit YulSafeERC20.UnpausedEvent();
         vault.unpause();
     }
+
+    /// @notice The owner cannot renounce, so a pause can always be lifted
+    function test_renounceOwnershipDisabled() public {
+        vault.pause();
+        vm.expectRevert(YulSafeERC20.RenounceOwnershipDisabled.selector);
+        vault.renounceOwnership();
+        assertEq(vault.owner(), address(this));
+
+        // Ownership can still move to another account
+        vault.transferOwnership(alice);
+        assertEq(vault.owner(), alice);
+    }
+
+    /// @notice Non-owners still get Solady's Unauthorized, not the new error
+    function test_renounceOwnershipOnlyOwner() public {
+        vm.prank(bob);
+        vm.expectRevert(bytes4(0x82b42900)); // Ownable.Unauthorized()
+        vault.renounceOwnership();
+    }
 }
